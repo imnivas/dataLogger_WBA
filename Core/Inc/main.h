@@ -28,6 +28,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32wbaxx_hal.h"
+
 #include "app_conf.h"
 #include "app_entry.h"
 #include "app_common.h"
@@ -68,14 +69,6 @@ extern "C" {
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
-void MX_GPIO_Init(void);
-void MX_GPDMA1_Init(void);
-void MX_RAMCFG_Init(void);
-void MX_RTC_Init(void);
-void MX_USART1_UART_Init(void);
-void MX_ADC4_Init(void);
-void MX_CRC_Init(void);
-void MX_ICACHE_Init(void);
 
 /* USER CODE BEGIN EFP */
 

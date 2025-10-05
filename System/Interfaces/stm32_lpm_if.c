@@ -22,7 +22,8 @@
 #if defined (__ARMCC_VERSION) && (__ARMCC_VERSION >= 6010050)
 #include "arm_compat.h"
 #endif /*(__ARMCC_VERSION) && (__ARMCC_VERSION >= 6010050) */
-#include "main.h"
+#include "gpio.h"
+//#include "rng.h"
 #include "scm.h"
 #include "app_sys.h"
 #include "stm32_lpm_if.h"

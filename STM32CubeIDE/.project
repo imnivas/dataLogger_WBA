@@ -240,14 +240,49 @@
 			<locationURI>PARENT-1-PROJECT_LOC/Drivers/STM32WBAxx_HAL_Driver/Src/stm32wbaxx_ll_utils.c</locationURI>
 		</link>
 		<link>
+			<name>Application/User/Core/adc.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/adc.c</locationURI>
+		</link>
+		<link>
 			<name>Application/User/Core/app_entry.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/app_entry.c</locationURI>
 		</link>
 		<link>
+			<name>Application/User/Core/crc.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/crc.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Core/gpdma.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/gpdma.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Core/gpio.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/gpio.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Core/icache.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/icache.c</locationURI>
+		</link>
+		<link>
 			<name>Application/User/Core/main.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/main.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Core/ramcfg.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/ramcfg.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Core/rtc.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/rtc.c</locationURI>
 		</link>
 		<link>
 			<name>Application/User/Core/stm32wbaxx_hal_msp.c</name>
@@ -258,6 +293,11 @@
 			<name>Application/User/Core/stm32wbaxx_it.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/stm32wbaxx_it.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Core/usart.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/usart.c</locationURI>
 		</link>
 		<link>
 			<name>Common/WPAN/Interface/adv_trace_usart_if.c</name>

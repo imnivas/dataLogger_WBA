@@ -250,7 +250,7 @@
  *   - 0 : Stop mode 1 is used as low power mode.
  *
  ******************************************************************************/
-#define CFG_LPM_LEVEL            (0)
+#define CFG_LPM_LEVEL            (1)
 #define CFG_LPM_STDBY_SUPPORTED  (0)
 
 /**

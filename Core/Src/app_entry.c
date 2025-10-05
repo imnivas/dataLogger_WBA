@@ -57,6 +57,7 @@
 /* Private includes -----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "app_bsp.h"
+#include "usart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/

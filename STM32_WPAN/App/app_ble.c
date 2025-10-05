@@ -590,7 +590,7 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
         {
           /* USER CODE BEGIN RADIO_ACTIVITY_EVENT */
           #if (CFG_LED_SUPPORTED == 1)
-//          BSP_LED_On(LED_GREEN);
+          BSP_LED_On(LED_BLUE);
           #endif
           UTIL_TIMER_StartWithPeriod(&bleAppContext.SwitchOffGPIO_timer_Id, LED_ON_TIMEOUT_MS);
           /* USER CODE END RADIO_ACTIVITY_EVENT */
@@ -1770,7 +1770,7 @@ static void Adv_Cancel_Req(void *arg)
 static void Switch_OFF_GPIO(void *arg)
 {
   #if (CFG_LED_SUPPORTED == 1)
-//  BSP_LED_Off(LED_GREEN);
+  BSP_LED_Off(LED_BLUE);
   #endif
   return;
 }
@@ -1778,7 +1778,7 @@ static void Switch_OFF_GPIO(void *arg)
 static void Adv_Cancel(void)
 {
   #if (CFG_LED_SUPPORTED == 1)
- // BSP_LED_Off(LED_GREEN);
+  BSP_LED_Off(LED_BLUE);
   #endif
 
   APP_BLE_Procedure_Gap_Peripheral(PROC_GAP_PERIPH_ADVERTISE_STOP);

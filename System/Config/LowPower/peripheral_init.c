@@ -20,7 +20,11 @@
 /* Includes ------------------------------------------------------------------*/
 #include "app_conf.h"
 #include "peripheral_init.h"
-#include "main.h"
+#include "usart.h"
+#include "gpio.h"
+#include "gpdma.h"
+#include "icache.h"
+#include "ramcfg.h"
 #include "crc_ctrl.h"
 #if (USE_TEMPERATURE_BASED_RADIO_CALIBRATION == 1)
 #include "adc_ctrl.h"
@@ -34,10 +38,11 @@
 /* USER CODE END Includes */
 
 /* External variables --------------------------------------------------------*/
-extern RAMCFG_HandleTypeDef hramcfg_SRAM1;
 extern DMA_HandleTypeDef handle_GPDMA1_Channel1;
 extern DMA_HandleTypeDef handle_GPDMA1_Channel0;
+extern UART_HandleTypeDef hlpuart1;
 extern UART_HandleTypeDef huart1;
+extern RAMCFG_HandleTypeDef hramcfg_SRAM1;
 
 /* USER CODE BEGIN EV */
 
@@ -96,12 +101,13 @@ void MX_StandbyExit_PeripheralInit(void)
     __HAL_RCC_GPIOB_CLK_DISABLE();
 #endif /* CFG_DEBUGGER_LEVEL */
 
-  memset(&hramcfg_SRAM1, 0, sizeof(hramcfg_SRAM1));
   memset(&handle_GPDMA1_Channel1, 0, sizeof(handle_GPDMA1_Channel1));
   memset(&handle_GPDMA1_Channel0, 0, sizeof(handle_GPDMA1_Channel0));
+  memset(&hlpuart1, 0, sizeof(hlpuart1));
 #if (CFG_LOG_SUPPORTED == 1)
   memset(&huart1, 0, sizeof(huart1));
 #endif
+  memset(&hramcfg_SRAM1, 0, sizeof(hramcfg_SRAM1));
 
   MX_GPIO_Init();
   MX_GPDMA1_Init();
