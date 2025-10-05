@@ -388,7 +388,7 @@ void HASH_IRQHandler(void)
   */
 void EXTI6_IRQHandler(void)
 {
-  BSP_PB_IRQHandler(B2);
+  //BSP_PB_IRQHandler(B2);
 }
 
 /**
@@ -396,7 +396,7 @@ void EXTI6_IRQHandler(void)
   */
 void EXTI7_IRQHandler(void)
 {
-  BSP_PB_IRQHandler(B3);
+  //BSP_PB_IRQHandler(B3);
 }
 
 /**

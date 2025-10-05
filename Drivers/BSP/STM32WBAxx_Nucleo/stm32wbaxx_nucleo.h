@@ -51,21 +51,32 @@ extern "C" {
 /** @defgroup STM32WBAXX_NUCLEO_COMMON_Exported_Types STM32WBAXX_NUCLEO COMMON Exported Types
   * @{
   */
+//typedef enum
+//{
+//  LD1 = 0,
+//  LED_BLUE = LD1,
+//  LD2 = 1,
+//  LED_GREEN = LD2,
+//  LD3 = 2,
+//  LED_RED = LD3
+//} Led_TypeDef;
+//
+//typedef enum
+//{
+//  B1 = 0,
+//  B2 = 1,
+//  B3 = 2
+//} Button_TypeDef;
+
 typedef enum
 {
   LD1 = 0,
-  LED_BLUE = LD1,
-  LD2 = 1,
-  LED_GREEN = LD2,
-  LD3 = 2,
-  LED_RED = LD3
+  LED_BLUE = LD1
 } Led_TypeDef;
 
 typedef enum
 {
-  B1 = 0,
-  B2 = 1,
-  B3 = 2
+  B1 = 0
 } Button_TypeDef;
 
 typedef enum
@@ -154,35 +165,42 @@ typedef struct
 /** @defgroup STM32WBAXX_NUCLEO_COMMON_LED STM32WBAXX_NUCLEO COMMON LED
   * @{
   */
-#define LEDn                                   3U
 
-#if defined (STM32WBA65xx)
-/* STM32WBA65xx */
-#define LD1_GPIO_PORT                          GPIOD
-#define LD1_GPIO_CLK_ENABLE()                  __HAL_RCC_GPIOD_CLK_ENABLE()
-#define LD1_PIN                                GPIO_PIN_8
-#else
-/* STM32WBA55xx */
+#define LEDn                                   1U
+
 #define LD1_GPIO_PORT                          GPIOB
 #define LD1_GPIO_CLK_ENABLE()                  __HAL_RCC_GPIOB_CLK_ENABLE()
-#define LD1_PIN                                GPIO_PIN_4
-#endif
+#define LD1_PIN                                GPIO_PIN_0
 
-#if defined (STM32WBA65xx)
-/* STM32WBA65xx */
-#define LD2_GPIO_PORT                          GPIOC
-#define LD2_GPIO_CLK_ENABLE()                  __HAL_RCC_GPIOC_CLK_ENABLE()
-#define LD2_PIN                                GPIO_PIN_4
-#else
-/* STM32WBA55xx */
-#define LD2_GPIO_PORT                          GPIOA
-#define LD2_GPIO_CLK_ENABLE()                  __HAL_RCC_GPIOA_CLK_ENABLE()
-#define LD2_PIN                                GPIO_PIN_9
-#endif
-
-#define LD3_GPIO_PORT                          GPIOB
-#define LD3_GPIO_CLK_ENABLE()                  __HAL_RCC_GPIOB_CLK_ENABLE()
-#define LD3_PIN                                GPIO_PIN_8
+//#define LEDn                                   3U
+//
+//#if defined (STM32WBA65xx)
+///* STM32WBA65xx */
+//#define LD1_GPIO_PORT                          GPIOD
+//#define LD1_GPIO_CLK_ENABLE()                  __HAL_RCC_GPIOD_CLK_ENABLE()
+//#define LD1_PIN                                GPIO_PIN_8
+//#else
+///* STM32WBA55xx */
+//#define LD1_GPIO_PORT                          GPIOB
+//#define LD1_GPIO_CLK_ENABLE()                  __HAL_RCC_GPIOB_CLK_ENABLE()
+//#define LD1_PIN                                GPIO_PIN_4
+//#endif
+//
+//#if defined (STM32WBA65xx)
+///* STM32WBA65xx */
+//#define LD2_GPIO_PORT                          GPIOC
+//#define LD2_GPIO_CLK_ENABLE()                  __HAL_RCC_GPIOC_CLK_ENABLE()
+//#define LD2_PIN                                GPIO_PIN_4
+//#else
+///* STM32WBA55xx */
+//#define LD2_GPIO_PORT                          GPIOA
+//#define LD2_GPIO_CLK_ENABLE()                  __HAL_RCC_GPIOA_CLK_ENABLE()
+//#define LD2_PIN                                GPIO_PIN_9
+//#endif
+//
+//#define LD3_GPIO_PORT                          GPIOB
+//#define LD3_GPIO_CLK_ENABLE()                  __HAL_RCC_GPIOB_CLK_ENABLE()
+//#define LD3_PIN                                GPIO_PIN_8
 /**
   * @}
   */
@@ -190,7 +208,8 @@ typedef struct
 /** @defgroup STM32WBAXX_NUCLEO_COMMON_BUTTON STM32WBAXX_NUCLEO COMMON BUTTON
   * @{
   */
-#define BUTTONn                            3U
+
+#define BUTTONn                            1U
 
 #define B1_GPIO_PORT                       GPIOC
 #define B1_GPIO_CLK_ENABLE()               __HAL_RCC_GPIOC_CLK_ENABLE()
@@ -198,37 +217,45 @@ typedef struct
 #define B1_EXTI_LINE                       EXTI_LINE_13
 #define B1_EXTI_IRQn                       EXTI13_IRQn
 
-#if defined (STM32WBA65xx)
-/* STM32WBA65xx */
-#define B2_GPIO_PORT                       GPIOC
-#define B2_GPIO_CLK_ENABLE()               __HAL_RCC_GPIOC_CLK_ENABLE()
-#define B2_PIN                             GPIO_PIN_5
-#define B2_EXTI_LINE                       EXTI_LINE_5
-#define B2_EXTI_IRQn                       EXTI5_IRQn
-#else
-/* STM32WBA55xx */
-#define B2_GPIO_PORT                       GPIOB
-#define B2_GPIO_CLK_ENABLE()               __HAL_RCC_GPIOB_CLK_ENABLE()
-#define B2_PIN                             GPIO_PIN_6
-#define B2_EXTI_LINE                       EXTI_LINE_6
-#define B2_EXTI_IRQn                       EXTI6_IRQn
-#endif
-
-#if defined (STM32WBA65xx)
-/* STM32WBA65xx */
-#define B3_GPIO_PORT                       GPIOB
-#define B3_GPIO_CLK_ENABLE()               __HAL_RCC_GPIOB_CLK_ENABLE()
-#define B3_PIN                             GPIO_PIN_4
-#define B3_EXTI_LINE                       EXTI_LINE_4
-#define B3_EXTI_IRQn                       EXTI4_IRQn
-#else
-/* STM32WBA55xx */
-#define B3_GPIO_PORT                       GPIOB
-#define B3_GPIO_CLK_ENABLE()               __HAL_RCC_GPIOB_CLK_ENABLE()
-#define B3_PIN                             GPIO_PIN_7
-#define B3_EXTI_LINE                       EXTI_LINE_7
-#define B3_EXTI_IRQn                       EXTI7_IRQn
-#endif
+//#define BUTTONn                            3U
+//
+//#define B1_GPIO_PORT                       GPIOC
+//#define B1_GPIO_CLK_ENABLE()               __HAL_RCC_GPIOC_CLK_ENABLE()
+//#define B1_PIN                             GPIO_PIN_13
+//#define B1_EXTI_LINE                       EXTI_LINE_13
+//#define B1_EXTI_IRQn                       EXTI13_IRQn
+//
+//#if defined (STM32WBA65xx)
+///* STM32WBA65xx */
+//#define B2_GPIO_PORT                       GPIOC
+//#define B2_GPIO_CLK_ENABLE()               __HAL_RCC_GPIOC_CLK_ENABLE()
+//#define B2_PIN                             GPIO_PIN_5
+//#define B2_EXTI_LINE                       EXTI_LINE_5
+//#define B2_EXTI_IRQn                       EXTI5_IRQn
+//#else
+///* STM32WBA55xx */
+//#define B2_GPIO_PORT                       GPIOB
+//#define B2_GPIO_CLK_ENABLE()               __HAL_RCC_GPIOB_CLK_ENABLE()
+//#define B2_PIN                             GPIO_PIN_6
+//#define B2_EXTI_LINE                       EXTI_LINE_6
+//#define B2_EXTI_IRQn                       EXTI6_IRQn
+//#endif
+//
+//#if defined (STM32WBA65xx)
+///* STM32WBA65xx */
+//#define B3_GPIO_PORT                       GPIOB
+//#define B3_GPIO_CLK_ENABLE()               __HAL_RCC_GPIOB_CLK_ENABLE()
+//#define B3_PIN                             GPIO_PIN_4
+//#define B3_EXTI_LINE                       EXTI_LINE_4
+//#define B3_EXTI_IRQn                       EXTI4_IRQn
+//#else
+///* STM32WBA55xx */
+//#define B3_GPIO_PORT                       GPIOB
+//#define B3_GPIO_CLK_ENABLE()               __HAL_RCC_GPIOB_CLK_ENABLE()
+//#define B3_PIN                             GPIO_PIN_7
+//#define B3_EXTI_LINE                       EXTI_LINE_7
+//#define B3_EXTI_IRQn                       EXTI7_IRQn
+//#endif
 /**
   * @}
   */

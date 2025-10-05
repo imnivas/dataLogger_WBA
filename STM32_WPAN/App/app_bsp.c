@@ -47,7 +47,7 @@ typedef struct
 #ifdef CFG_BSP_ON_CEB
 #define BUTTON_NB_MAX                         (B2 + 1u)
 #else /* CFG_BSP_ON_CEB */
-#define BUTTON_NB_MAX                         (B3 + 1u)
+#define BUTTON_NB_MAX                         (B1 + 1u)
 #endif /* CFG_BSP_ON_CEB */
 #endif /* (CFG_BUTTON_SUPPORTED == 1) */
 
@@ -278,7 +278,7 @@ static osThreadId_t         ButtonB1Thread, ButtonB2Thread, ButtonB3Thread;
 static ButtonDesc_t         buttonDesc[BUTTON_NB_MAX] = { { B2, { 0 } , 0, 0 } };
 #endif /* CFG_BSP_ON_CEB */
 #ifdef CFG_BSP_ON_NUCLEO
-static ButtonDesc_t         buttonDesc[BUTTON_NB_MAX] = { { B1, { 0 }, 0, 0 } , { B2, { 0 } , 0, 0 }, { B3, { 0 }, 0, 0 } };
+static ButtonDesc_t         buttonDesc[BUTTON_NB_MAX] = { { B1, { 0 }, 0, 0 } };
 #endif /* CFG_BSP_ON_NUCLEO */
 #endif /* (CFG_BUTTON_SUPPORTED == 1) */
 
@@ -382,8 +382,8 @@ void APP_BSP_StandbyExit( void )
 #else /* defined(CFG_BSP_ON_DISCOVERY) && defined(STM32WBA65xx) */
   BSP_LED_Init(LED_BLUE);
 #ifdef CFG_BSP_ON_NUCLEO
-  BSP_LED_Init(LED_GREEN);
-  BSP_LED_Init(LED_RED);
+//  BSP_LED_Init(LED_GREEN);
+//  BSP_LED_Init(LED_RED);
 #endif /* CFG_BSP_ON_NUCLEO */
 #endif /* defined(CFG_BSP_ON_DISCOVERY) && defined(STM32WBA65xx) */
 #endif /* (CFG_LED_SUPPORTED == 1) */
@@ -404,8 +404,8 @@ void APP_BSP_StandbyExit( void )
 #ifdef CFG_BSP_ON_NUCLEO
   /* Buttons HW Initialization */
   BSP_PB_Init( B1, BUTTON_MODE_EXTI );
-  BSP_PB_Init( B2, BUTTON_MODE_EXTI );
-  BSP_PB_Init( B3, BUTTON_MODE_EXTI );
+//  BSP_PB_Init( B2, BUTTON_MODE_EXTI );
+//  BSP_PB_Init( B3, BUTTON_MODE_EXTI );
 #endif /* CFG_BSP_ON_NUCLEO */
 #endif /* (CFG_BUTTON_SUPPORTED == 1) */
 }
@@ -584,8 +584,8 @@ void APP_BSP_LedInit( void )
 #else /* defined(CFG_BSP_ON_DISCOVERY) && defined(STM32WBA65xx) */
   BSP_LED_Init(LED_BLUE);
 #ifdef CFG_BSP_ON_NUCLEO
-  BSP_LED_Init(LED_GREEN);
-  BSP_LED_Init(LED_RED);
+//  BSP_LED_Init(LED_GREEN);
+//  BSP_LED_Init(LED_RED);
 #endif /* CFG_BSP_ON_NUCLEO */
 #endif /* defined(CFG_BSP_ON_DISCOVERY) && defined(STM32WBA65xx) */
 }
@@ -1497,11 +1497,11 @@ static void Button_InitTask( void )
   /* Task associated with push button B1 */
   UTIL_SEQ_RegTask( 1U << CFG_TASK_BSP_BUTTON_B1, UTIL_SEQ_RFU, APP_BSP_Button1Action );
 
-  /* Task associated with push button B2 */
-  UTIL_SEQ_RegTask( 1U << CFG_TASK_BSP_BUTTON_B2, UTIL_SEQ_RFU, APP_BSP_Button2Action );
-
-  /* Task associated with push button B3 */
-  UTIL_SEQ_RegTask( 1U << CFG_TASK_BSP_BUTTON_B3, UTIL_SEQ_RFU, APP_BSP_Button3Action );
+//  /* Task associated with push button B2 */
+//  UTIL_SEQ_RegTask( 1U << CFG_TASK_BSP_BUTTON_B2, UTIL_SEQ_RFU, APP_BSP_Button2Action );
+//
+//  /* Task associated with push button B3 */
+//  UTIL_SEQ_RegTask( 1U << CFG_TASK_BSP_BUTTON_B3, UTIL_SEQ_RFU, APP_BSP_Button3Action );
 #endif /* CFG_BSP_ON_CEB */
 }
 
@@ -1520,8 +1520,8 @@ void APP_BSP_ButtonInit( void )
 #endif /* CFG_BSP_ON_CEB */
 #ifdef CFG_BSP_ON_NUCLEO
   BSP_PB_Init( B1, BUTTON_MODE_EXTI );
-  BSP_PB_Init( B2, BUTTON_MODE_EXTI );
-  BSP_PB_Init( B3, BUTTON_MODE_EXTI );
+//  BSP_PB_Init( B2, BUTTON_MODE_EXTI );
+//  BSP_PB_Init( B3, BUTTON_MODE_EXTI );
 
 #if (CFG_LPM_STDBY_SUPPORTED != 0)
   /* StandBy WakeUp via buttons */
@@ -1607,12 +1607,12 @@ static void Button_LaunchActionTask( Button_TypeDef button )
         UTIL_SEQ_SetTask( 1U << CFG_TASK_BSP_BUTTON_B1, CFG_SEQ_PRIO_0 );
         break;
 
-    case B2:
-        UTIL_SEQ_SetTask( 1U << CFG_TASK_BSP_BUTTON_B2, CFG_SEQ_PRIO_0 );
-        break;
-
-    case B3:
-        UTIL_SEQ_SetTask( 1U << CFG_TASK_BSP_BUTTON_B3, CFG_SEQ_PRIO_0 );
+//    case B2:
+//        UTIL_SEQ_SetTask( 1U << CFG_TASK_BSP_BUTTON_B2, CFG_SEQ_PRIO_0 );
+//        break;
+//
+//    case B3:
+//        UTIL_SEQ_SetTask( 1U << CFG_TASK_BSP_BUTTON_B3, CFG_SEQ_PRIO_0 );
         break;
 #endif /* CFG_BSP_ON_SEQUENCER */
 
@@ -1702,28 +1702,28 @@ uint8_t APP_BSP_SerialCmdExecute( uint8_t * pRxBuffer, uint16_t iRxBufferSize )
     APP_BSP_SetButtonIsLongPressed(B1);
     iUserChoice = B1;
   }
-  else if ( (strcmp( (char const*)pRxBuffer, "B2" ) == 0) ||
-            (strcmp( (char const*)pRxBuffer, "SW2" ) == 0) )
-  {
-    iUserChoice = B2;
-  }
-  else if ( (strcmp( (char const*)pRxBuffer, "B2L" ) == 0) ||
-            (strcmp( (char const*)pRxBuffer, "SW2L" ) == 0) )
-  {
-    APP_BSP_SetButtonIsLongPressed(B2);
-    iUserChoice = B2;
-  }
-  else if ( (strcmp( (char const*)pRxBuffer, "B3" ) == 0) ||
-            (strcmp( (char const*)pRxBuffer, "SW3" ) == 0) )
-  {
-    iUserChoice = B3;
-  }
-  else if ( (strcmp( (char const*)pRxBuffer, "B3L" ) == 0) ||
-            (strcmp( (char const*)pRxBuffer, "SW3L" ) == 0) )
-  {
-    APP_BSP_SetButtonIsLongPressed(B3);
-    iUserChoice = B3;
-  }
+//  else if ( (strcmp( (char const*)pRxBuffer, "B2" ) == 0) ||
+//            (strcmp( (char const*)pRxBuffer, "SW2" ) == 0) )
+//  {
+//    iUserChoice = B2;
+//  }
+//  else if ( (strcmp( (char const*)pRxBuffer, "B2L" ) == 0) ||
+//            (strcmp( (char const*)pRxBuffer, "SW2L" ) == 0) )
+//  {
+//    APP_BSP_SetButtonIsLongPressed(B2);
+//    iUserChoice = B2;
+//  }
+//  else if ( (strcmp( (char const*)pRxBuffer, "B3" ) == 0) ||
+//            (strcmp( (char const*)pRxBuffer, "SW3" ) == 0) )
+//  {
+//    iUserChoice = B3;
+//  }
+//  else if ( (strcmp( (char const*)pRxBuffer, "B3L" ) == 0) ||
+//            (strcmp( (char const*)pRxBuffer, "SW3L" ) == 0) )
+//  {
+//    APP_BSP_SetButtonIsLongPressed(B3);
+//    iUserChoice = B3;
+//  }
 #endif /* CFG_BSP_ON_CEB */
 #endif /* ( CFG_BUTTON_SUPPORTED == 1 )  */
 #if ( CFG_JOYSTICK_SUPPORTED == 1 )

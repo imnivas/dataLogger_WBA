@@ -63,8 +63,8 @@ typedef void (* BSP_EXTI_LineCallback)(void);
   * @{
   */
 static void B1_EXTI_Callback(void);
-static void B2_EXTI_Callback(void);
-static void B3_EXTI_Callback(void);
+//static void B2_EXTI_Callback(void);
+//static void B3_EXTI_Callback(void);
 
 #if (USE_BSP_COM_FEATURE == 1)
 static void UART_MspInit(UART_HandleTypeDef *huart);
@@ -87,12 +87,20 @@ UART_HandleTypeDef hcom_uart[COMn];
 /** @defgroup STM32WBAXX_NUCLEO_COMMON_Private_Variables STM32WBAXX_NUCLEO COMMON Private Variables
   * @{
   */
-static uint16_t      LED_PIN[LEDn]  = {LD1_PIN, LD2_PIN, LD3_PIN};
-static GPIO_TypeDef *LED_PORT[LEDn] = {LD1_GPIO_PORT, LD2_GPIO_PORT, LD3_GPIO_PORT};
 
-static uint16_t           BUTTON_PIN[BUTTONn]  = {B1_PIN, B2_PIN, B3_PIN};
-static GPIO_TypeDef      *BUTTON_PORT[BUTTONn] = {B1_GPIO_PORT, B2_GPIO_PORT, B3_GPIO_PORT};
-static IRQn_Type          BUTTON_IRQn[BUTTONn] = {B1_EXTI_IRQn, B2_EXTI_IRQn, B3_EXTI_IRQn};
+static uint16_t      LED_PIN[LEDn]  = {LD1_PIN};
+static GPIO_TypeDef *LED_PORT[LEDn] = {LD1_GPIO_PORT};
+
+static uint16_t           BUTTON_PIN[BUTTONn]  = {B1_PIN};
+static GPIO_TypeDef      *BUTTON_PORT[BUTTONn] = {B1_GPIO_PORT};
+static IRQn_Type          BUTTON_IRQn[BUTTONn] = {B1_EXTI_IRQn};
+
+//static uint16_t      LED_PIN[LEDn]  = {LD1_PIN, LD2_PIN, LD3_PIN};
+//static GPIO_TypeDef *LED_PORT[LEDn] = {LD1_GPIO_PORT, LD2_GPIO_PORT, LD3_GPIO_PORT};
+//
+//static uint16_t           BUTTON_PIN[BUTTONn]  = {B1_PIN, B2_PIN, B3_PIN};
+//static GPIO_TypeDef      *BUTTON_PORT[BUTTONn] = {B1_GPIO_PORT, B2_GPIO_PORT, B3_GPIO_PORT};
+//static IRQn_Type          BUTTON_IRQn[BUTTONn] = {B1_EXTI_IRQn, B2_EXTI_IRQn, B3_EXTI_IRQn};
 static EXTI_HandleTypeDef hpb_exti[BUTTONn];
 
 #if (USE_BSP_COM_FEATURE == 1)
@@ -178,14 +186,14 @@ int32_t BSP_LED_Init(Led_TypeDef Led)
   {
     LD1_GPIO_CLK_ENABLE();
   }
-  else if (Led == LD2)
-  {
-    LD2_GPIO_CLK_ENABLE();
-  }
-  else /* Led = LD3 */
-  {
-    LD3_GPIO_CLK_ENABLE();
-  }
+//  else if (Led == LD2)
+//  {
+//    LD2_GPIO_CLK_ENABLE();
+//  }
+//  else /* Led = LD3 */
+//  {
+//    LD3_GPIO_CLK_ENABLE();
+//  }
 
   /* configure the GPIO_LED pin */
   GPIO_Init.Pin   = LED_PIN[Led];
@@ -313,27 +321,31 @@ int32_t BSP_PB_Init(Button_TypeDef Button, ButtonMode_TypeDef ButtonMode)
 {
   int32_t               status = BSP_ERROR_NONE;
   GPIO_InitTypeDef      GPIO_Init;
-  uint32_t              BSP_BUTTON_IT_PRIO[BUTTONn] = {BSP_B1_IT_PRIORITY,
-                                                       BSP_B2_IT_PRIORITY,
-                                                       BSP_B3_IT_PRIORITY};
-  uint32_t              BUTTON_EXTI_LINE[BUTTONn]   = {B1_EXTI_LINE, B2_EXTI_LINE, B3_EXTI_LINE};
-  BSP_EXTI_LineCallback ButtonCallback[BUTTONn]     = {B1_EXTI_Callback,
-                                                       B2_EXTI_Callback,
-                                                       B3_EXTI_Callback};
+  uint32_t              BSP_BUTTON_IT_PRIO[BUTTONn] = {BSP_B1_IT_PRIORITY};
+  uint32_t              BUTTON_EXTI_LINE[BUTTONn]   = {B1_EXTI_LINE};
+  BSP_EXTI_LineCallback ButtonCallback[BUTTONn]     = {B1_EXTI_Callback};
+
+//  uint32_t              BSP_BUTTON_IT_PRIO[BUTTONn] = {BSP_B1_IT_PRIORITY,
+//                                                       BSP_B2_IT_PRIORITY,
+//                                                       BSP_B3_IT_PRIORITY};
+//  uint32_t              BUTTON_EXTI_LINE[BUTTONn]   = {B1_EXTI_LINE, B2_EXTI_LINE, B3_EXTI_LINE};
+//  BSP_EXTI_LineCallback ButtonCallback[BUTTONn]     = {B1_EXTI_Callback,
+//                                                       B2_EXTI_Callback,
+//                                                       B3_EXTI_Callback};
 
   /* Enable the BUTTON clock */
   if (Button == B1)
   {
     B1_GPIO_CLK_ENABLE();
   }
-  else if (Button == B2)
-  {
-    B2_GPIO_CLK_ENABLE();
-  }
-  else /* B3 */
-  {
-    B3_GPIO_CLK_ENABLE();
-  }
+//  else if (Button == B2)
+//  {
+//    B2_GPIO_CLK_ENABLE();
+//  }
+//  else /* B3 */
+//  {
+//    B3_GPIO_CLK_ENABLE();
+//  }
 
   GPIO_Init.Pin   = BUTTON_PIN[Button];
   GPIO_Init.Pull  = GPIO_PULLUP;
@@ -679,19 +691,19 @@ static void B1_EXTI_Callback(void)
   * @brief  B2 EXTI line detection callbacks.
   * @retval None.
   */
-static void B2_EXTI_Callback(void)
-{
-  BSP_PB_Callback(B2);
-}
+//static void B2_EXTI_Callback(void)
+//{
+//  BSP_PB_Callback(B2);
+//}
 
 /**
   * @brief  B3 EXTI line detection callbacks.
   * @retval None.
   */
-static void B3_EXTI_Callback(void)
-{
-  BSP_PB_Callback(B3);
-}
+//static void B3_EXTI_Callback(void)
+//{
+//  BSP_PB_Callback(B3);
+//}
 
 #if (USE_BSP_COM_FEATURE == 1)
 /**
