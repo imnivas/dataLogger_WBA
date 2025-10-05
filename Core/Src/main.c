@@ -19,10 +19,13 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "gpdma.h"
+#include "i2c.h"
 #include "icache.h"
+#include "lptim.h"
 #include "usart.h"
 #include "ramcfg.h"
 #include "rtc.h"
+//#include "tim.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -102,6 +105,10 @@ int main(void)
   MX_RTC_Init();
   MX_ICACHE_Init();
   MX_LPUART1_UART_Init();
+  MX_LPTIM1_Init();
+  MX_LPTIM2_Init();
+  MX_I2C1_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */

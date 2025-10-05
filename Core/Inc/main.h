@@ -75,6 +75,22 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define SLAVE_SW_Pin GPIO_PIN_5
+#define SLAVE_SW_GPIO_Port GPIOA
+#define SLAVE_TX_Pin GPIO_PIN_2
+#define SLAVE_TX_GPIO_Port GPIOA
+#define SLAVE_RX_Pin GPIO_PIN_1
+#define SLAVE_RX_GPIO_Port GPIOA
+#define PULSE_CH1_Pin GPIO_PIN_0
+#define PULSE_CH1_GPIO_Port GPIOA
+#define PULSE_CH2_Pin GPIO_PIN_9
+#define PULSE_CH2_GPIO_Port GPIOB
+#define GSM_TX_Pin GPIO_PIN_12
+#define GSM_TX_GPIO_Port GPIOA
+#define GSM_RX_Pin GPIO_PIN_11
+#define GSM_RX_GPIO_Port GPIOA
+#define BOOST_MODE_ON_Pin GPIO_PIN_14
+#define BOOST_MODE_ON_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

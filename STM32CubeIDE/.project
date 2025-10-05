@@ -150,6 +150,21 @@
 			<locationURI>PARENT-1-PROJECT_LOC/Drivers/STM32WBAxx_HAL_Driver/Src/stm32wbaxx_hal_gpio.c</locationURI>
 		</link>
 		<link>
+			<name>Drivers/STM32WBAxx_HAL_Driver/stm32wbaxx_hal_i2c.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Drivers/STM32WBAxx_HAL_Driver/Src/stm32wbaxx_hal_i2c.c</locationURI>
+		</link>
+		<link>
+			<name>Drivers/STM32WBAxx_HAL_Driver/stm32wbaxx_hal_i2c_ex.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Drivers/STM32WBAxx_HAL_Driver/Src/stm32wbaxx_hal_i2c_ex.c</locationURI>
+		</link>
+		<link>
+			<name>Drivers/STM32WBAxx_HAL_Driver/stm32wbaxx_hal_lptim.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Drivers/STM32WBAxx_HAL_Driver/Src/stm32wbaxx_hal_lptim.c</locationURI>
+		</link>
+		<link>
 			<name>Drivers/STM32WBAxx_HAL_Driver/stm32wbaxx_hal_pwr.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Drivers/STM32WBAxx_HAL_Driver/Src/stm32wbaxx_hal_pwr.c</locationURI>
@@ -265,9 +280,19 @@
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/gpio.c</locationURI>
 		</link>
 		<link>
+			<name>Application/User/Core/i2c.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/i2c.c</locationURI>
+		</link>
+		<link>
 			<name>Application/User/Core/icache.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/icache.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Core/lptim.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/lptim.c</locationURI>
 		</link>
 		<link>
 			<name>Application/User/Core/main.c</name>
