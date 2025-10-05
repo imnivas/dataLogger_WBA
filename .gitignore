@@ -1,0 +1,11 @@
+.DS_Store
+*.launch
+Binary
+STM32CubeIDE/.settings
+STM32CubeIDE/*.launch
+STM32CubeIDE/Debug/*
+STM32CubeIDE/Release/*
+!STM32CubeIDE/Debug/*.bin
+!STM32CubeIDE/Debug/*.elf
+!STM32CubeIDE/Release/*.bin
+!STM32CubeIDE/Release/*.elf
