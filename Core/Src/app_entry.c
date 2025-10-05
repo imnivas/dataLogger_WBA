@@ -58,6 +58,7 @@
 /* USER CODE BEGIN Includes */
 #include "app_bsp.h"
 #include "usart.h"
+#include "application.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -225,7 +226,7 @@ uint32_t MX_APPE_Init(void *p_param)
   FD_SetStatus (FD_FLASHACCESS_RFTS_BYPASS, LL_FLASH_DISABLE);
 
   /* USER CODE BEGIN APPE_Init_2 */
-
+  UserApplicationInit();
   /* USER CODE END APPE_Init_2 */
 
   APP_DEBUG_SIGNAL_RESET(APP_APPE_INIT);

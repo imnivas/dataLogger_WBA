@@ -255,6 +255,11 @@
 			<locationURI>PARENT-1-PROJECT_LOC/Drivers/STM32WBAxx_HAL_Driver/Src/stm32wbaxx_ll_utils.c</locationURI>
 		</link>
 		<link>
+			<name>Application/User/Cellular/cellular.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Cellular/cellular.c</locationURI>
+		</link>
+		<link>
 			<name>Application/User/Core/adc.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/adc.c</locationURI>
@@ -323,6 +328,11 @@
 			<name>Application/User/Core/usart.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/usart.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/UserApplication/application.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/UserApplication/application.c</locationURI>
 		</link>
 		<link>
 			<name>Common/WPAN/Interface/adv_trace_usart_if.c</name>
