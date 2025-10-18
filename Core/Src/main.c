@@ -108,7 +108,6 @@ int main(void)
   MX_LPTIM1_Init();
   MX_LPTIM2_Init();
   MX_I2C1_Init();
-  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */

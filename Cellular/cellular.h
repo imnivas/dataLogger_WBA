@@ -9,6 +9,7 @@
 #define APPLICATION_USER_CELLULAR_CELLULAR_H_
 
 void CellularInit(void);
+void CellularDeInit(void);
 
 
 #endif /* APPLICATION_USER_CELLULAR_CELLULAR_H_ */

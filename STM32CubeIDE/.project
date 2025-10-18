@@ -260,6 +260,11 @@
 			<locationURI>PARENT-1-PROJECT_LOC/Cellular/cellular.c</locationURI>
 		</link>
 		<link>
+			<name>Application/User/Cellular/command.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Cellular/command.c</locationURI>
+		</link>
+		<link>
 			<name>Application/User/Core/adc.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/adc.c</locationURI>

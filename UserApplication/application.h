@@ -10,4 +10,6 @@
 
 void UserApplicationInit(void);
 
+void Send_Data_Done(void);
+
 #endif /* APPLICATION_USER_USERAPPLICATION_APPLICATION_H_ */

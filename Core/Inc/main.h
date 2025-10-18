@@ -85,10 +85,12 @@ void Error_Handler(void);
 #define PULSE_CH1_GPIO_Port GPIOA
 #define PULSE_CH2_Pin GPIO_PIN_9
 #define PULSE_CH2_GPIO_Port GPIOB
-#define GSM_TX_Pin GPIO_PIN_12
-#define GSM_TX_GPIO_Port GPIOA
-#define GSM_RX_Pin GPIO_PIN_11
-#define GSM_RX_GPIO_Port GPIOA
+#define CELLULAR_TX_Pin GPIO_PIN_12
+#define CELLULAR_TX_GPIO_Port GPIOA
+#define CELLULAR_RX_Pin GPIO_PIN_11
+#define CELLULAR_RX_GPIO_Port GPIOA
+#define CELLULAR_ANT_SW_Pin GPIO_PIN_15
+#define CELLULAR_ANT_SW_GPIO_Port GPIOB
 #define BOOST_MODE_ON_Pin GPIO_PIN_14
 #define BOOST_MODE_ON_GPIO_Port GPIOB
 
