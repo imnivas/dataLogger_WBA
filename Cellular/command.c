@@ -60,11 +60,13 @@ int creg_stat = -1;
 int cgreg_n = 0;
 int cgreg_stat = -1;
 int network_opened = 0;
+int tcp_udp_network_opened = 0;
 int ntp_request_retry = 5;
 int network_register_retry = 5;
 int data_register_retry = 5;
-uint32_t timer_period_modem_init_ms = 10000;
-uint32_t timer_period_modem_cmd_ms = 1000;
+int cip_close = -1;
+uint32_t timer_period_modem_init_ms = 60000;
+uint32_t timer_period_modem_cmd_ms = 200;
 uint8_t dataToSend[] = { 0x90, 0x1c, 0xae, 0x8d, 0x2a, 0xe1, 0x81, 0x11, 0x11,
 		0x00, 0x98, 0x50, 0x01, 0x00, 0x18, 0x00, 0x62, 0x63, 0xef, 0x68, 0x01,
 		0xa6, 0x9e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -83,6 +85,7 @@ static void (*RxCpltCallbackhlp1)(uint8_t *rxChar, uint16_t size, uint8_t error)
 #define MODEM_AT_READY      "*ATREADY: 1"
 #define MODEM_CPIN_READY    "+CPIN: READY"
 #define MODEM_SMS_DONE      "SMS DONE"
+#define MODEM_CGEV		    "+CGEV"
 #define MODEM_CSQ 		    "+CSQ"
 #define MODEM_CREG 			"+CREG"
 #define MODEM_CGREG 		"+CGREG"
@@ -103,6 +106,7 @@ static void (*RxCpltCallbackhlp1)(uint8_t *rxChar, uint16_t size, uint8_t error)
 void modem_at_ready(const char *param);
 void modem_sim_ready(const char *param);
 void modem_sms_ready(const char *param);
+void modem_cgev(const char *param);
 void modem_ok_resp(const char *param);
 void modem_error_resp(const char *param);
 
@@ -161,6 +165,9 @@ static const struct ATResponse_s ATResponse[] = {
 		//
 		{ .string = MODEM_SMS_DONE, .size_string = sizeof(MODEM_CPIN_READY) - 1,
 				.set = do_nothing, .run = modem_sms_ready },
+		//
+		{ .string = MODEM_CGEV, .size_string = sizeof(MODEM_CGEV) - 1, .set =
+				modem_cgev, .run = do_nothing },
 		//
 		{ .string = MODEM_CSQ, .size_string = sizeof(MODEM_CSQ) - 1, .set =
 				modem_csq, .run = do_nothing },
@@ -278,6 +285,49 @@ void modem_sms_ready(const char *param) {
 	modem_status.is_sms_ready = 1;
 	LOG_INFO_APP("Modem is ready for sms\r\n");
 	check_modem_status();
+}
+
+void modem_cgev(const char *param) {
+//	LOG_INFO_APP("Modem CGEV event:%s\r\n", param);
+//	+CGEV: NW PDN ACT 1
+//	+CGEV: NW PDN DEACT 1
+//	+CGEV: ME PDN DEACT 1
+//	+CGEV: ME PDN DEACT 1
+//	+CGEV: EPS PDN ACT 1
+//	+CGEV: NW REATTACH
+	if (strstr(param, "PDN ACT")) {
+		network_opened = 1;
+		LOG_INFO_APP("Modem network opened event\r\n");
+		if (UTIL_TIMER_IsRunning(&cellularContext.cellular_command_timer_Id)
+				== 0) {
+			LOG_INFO_APP("AT Start Command Timer\r\n");
+			current_command = AT_CREG;
+			UTIL_TIMER_StartWithPeriod(
+					&cellularContext.cellular_command_timer_Id,
+					timer_period_modem_cmd_ms);
+		} else {
+			uint32_t timer_remaining_period = 0;
+			UTIL_TIMER_GetRemainingTime(
+					&cellularContext.cellular_command_timer_Id,
+					&timer_remaining_period);
+			if (timer_remaining_period > timer_period_modem_cmd_ms) {
+				LOG_INFO_APP("AT Already Started and Pending Time :%d\r\n",
+						timer_remaining_period);
+				UTIL_TIMER_Stop(&cellularContext.cellular_command_timer_Id);
+				current_command = AT_CREG;
+				UTIL_TIMER_StartWithPeriod(
+						&cellularContext.cellular_command_timer_Id,
+						timer_period_modem_cmd_ms);
+			}
+
+		}
+	} else if (strstr(param, "PDN DEACT")) {
+		network_opened = 0;
+		LOG_INFO_APP("Modem network closed event\r\n");
+	} else if (strstr(param, "REATTACH")) {
+		LOG_INFO_APP("Modem reattach event\r\n");
+	}
+
 }
 
 void modem_creg(const char *param) {
@@ -468,20 +518,20 @@ void modem_ok_resp(const char *param) {
 			&& current_command != AT_CIPCLOSE) {
 
 //		if (creg_stat == 1 || creg_stat == 5 || creg_stat == -1) {
-			current_command++;
-			//LOG_INFO_APP("Current Command %d execute\r\n", current_command);
-			if (current_command < AT_MAX_SEQ) { //AT_MAX is not a command, just to indicate the end of commands
-				UTIL_TIMER_StartWithPeriod(
-						&cellularContext.cellular_command_timer_Id,
-						timer_period_modem_cmd_ms);
-			} else {
+		current_command++;
+		//LOG_INFO_APP("Current Command %d execute\r\n", current_command);
+		if (current_command < AT_MAX_SEQ) { //AT_MAX is not a command, just to indicate the end of commands
+			UTIL_TIMER_StartWithPeriod(
+					&cellularContext.cellular_command_timer_Id,
+					timer_period_modem_cmd_ms);
+		} else {
 //				current_command = 0;
 //				UTIL_TIMER_StartWithPeriod(
 //						&cellularContext.cellular_command_timer_Id,
 //						timer_period_modem_cmd_ms);
 
-				Send_Data_Done();
-			}
+			Send_Data_Done();
+		}
 //		} else {
 //			UTIL_TIMER_StartWithPeriod(
 //					&cellularContext.cellular_command_timer_Id,
@@ -540,8 +590,8 @@ void modem_cclk(const char *param) {
 
 	int year, month, day, hour, min, sec, tz;
 	if (7
-			== tiny_sscanf(param, "%d/%d/%d,%d:%d:%d%+%d", &year, &month, &day,
-					&hour, &min, &sec, &tz)) {
+			== tiny_sscanf(param, " \"%d/%d/%d,%d:%d:%d%+%d\"", &year, &month,
+					&day, &hour, &min, &sec, &tz)) {
 		LOG_INFO_APP("Modem CCLK parse date time :%d-%d-%d %d:%d:%d tz:%d\r\n",
 				year, month, day, hour, min, sec, tz);
 		//convert to epoch time
@@ -574,9 +624,7 @@ void modem_ipclose(const char *param) {
 			&conn_id, &close_reason)) {
 		LOG_INFO_APP("Modem IPCLOSE connection %d closed, reason %d\r\n",
 				conn_id, close_reason);
-//		current_command++;
-//		UTIL_TIMER_StartWithPeriod(&cellularContext.cellular_command_timer_Id,
-//				2000);
+		cip_close = close_reason;
 	} else {
 		LOG_INFO_APP("Modem IPCLOSE parse error\r\n");
 	}
@@ -728,11 +776,16 @@ static void Send_Cellular_Command_Req(void *arg) {
 		GSM_Uart_Transmit((uint8_t*) cmd12, strlen(cmd12));
 		break;
 	case AT_CIPCLOSE: //AT+CIPCLOSE=1
-		const char *cmd13 = "AT+CIPCLOSE=1\r\n";
-		GSM_Uart_Transmit((uint8_t*) cmd13, strlen(cmd13));
-		current_command = 0;
-//		UTIL_TIMER_StartWithPeriod(&cellularContext.cellular_command_timer_Id,
-//				20000);
+		if (cip_close > 0) {
+			LOG_INFO_APP(
+					"Remote closed the connection, no need to send CIPCLOSE\r\n");
+			current_command = 0;
+			Send_Data_Done();
+			break;
+		} else {
+			const char *cmd13 = "AT+CIPCLOSE=1\r\n";
+			GSM_Uart_Transmit((uint8_t*) cmd13, strlen(cmd13));
+		}
 		break;
 
 	}
@@ -778,7 +831,7 @@ void CMD_Process(void) {
 	while (charCount != 0) {
 #if 1 /* echo On    */
 		//LOG_INFO_APP(":%d, %c  ", ridx, circBuffer[ridx]);
-		//LOG_INFO_APP("%c",circBuffer[ridx]);
+		//LOG_INFO_APP("%c", circBuffer[ridx]);
 #endif /* 0 */
 
 		if (circBuffer[ridx] == AT_ERROR_RX_CHAR) {
@@ -791,8 +844,20 @@ void CMD_Process(void) {
 			UTILS_EXIT_CRITICAL_SECTION();
 			com_error(AT_RX_ERROR);
 			i = 0;
-		} else if ((circBuffer[ridx] == '\r') || (circBuffer[ridx] == '\n')
-				|| (circBuffer[ridx] == '>')) {
+		} else if (circBuffer[ridx] == '>') {
+			ridx++;
+			if (ridx == CIRC_BUFF_SIZE) {
+				ridx = 0;
+			}
+			UTILS_ENTER_CRITICAL_SECTION();
+			charCount--;
+			UTILS_EXIT_CRITICAL_SECTION();
+			command[0] = '>';
+			command[1] = '\0';
+			parse_cmd(command);
+			i = 0;
+
+		} else if ((circBuffer[ridx] == '\r') || (circBuffer[ridx] == '\n')) {
 			//LOG_INFO_APP("%c",circBuffer[ridx]);
 			ridx++;
 			if (ridx == CIRC_BUFF_SIZE) {
@@ -801,22 +866,6 @@ void CMD_Process(void) {
 			UTILS_ENTER_CRITICAL_SECTION();
 			charCount--;
 			UTILS_EXIT_CRITICAL_SECTION();
-			//LOG_INFO_APP("%c", circBuffer[ridx]);
-
-			if (circBuffer[ridx] == '>') {
-				LOG_INFO_APP("RRR:%s", command);
-				command[0] = '>';
-				command[1] = '\0';
-				UTILS_ENTER_CRITICAL_SECTION();
-				CMD_ProcessBackSpace(command);
-				UTILS_EXIT_CRITICAL_SECTION();
-
-				//LOG_INFO_APP("RRR:%s", command);
-
-				parse_cmd(command);
-				i = 0;
-			}
-
 			if (i != 0) {
 				command[i] = '\0';
 				UTILS_ENTER_CRITICAL_SECTION();
@@ -901,7 +950,7 @@ static void parse_cmd(const char *cmd) {
 	int i;
 
 	//define circular buffer variable for debug purpose to store the command *cmd
-	LOG_INFO_APP(":%s\r\n",cmd);
+	LOG_INFO_APP(":%s\r\n", cmd);
 	if (cmd[0] == '\0') {
 //		status = AT_OK;
 	} else if (cmd[0] == '9' && cmd[1] == '0') {
