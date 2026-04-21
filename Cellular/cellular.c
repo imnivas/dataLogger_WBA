@@ -53,7 +53,7 @@ static void BoostMode_GPIO_Init(void) {
 static void BoostMode_Enable(void) {
 	BoostMode_GPIO_Init();
 	HAL_GPIO_WritePin(BOOST_MODE_ON_GPIO_Port, BOOST_MODE_ON_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(CELLULAR_ANT_SW_GPIO_Port, CELLULAR_ANT_SW_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(CELLULAR_ANT_SW_GPIO_Port, CELLULAR_ANT_SW_Pin, GPIO_PIN_SET);
 	LOG_INFO_APP("BoostMode_Enable\n");
 }
 

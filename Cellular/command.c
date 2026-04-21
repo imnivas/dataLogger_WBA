@@ -129,25 +129,24 @@ void do_nothing(const char *param);
 void GSM_Uart_Transmit(uint8_t *p_data, uint16_t size);
 
 typedef enum AT_COMMANDS_SEQUENCE_e {
-	AT_CREG = 0,
-	AT_CGREG = 1,
-	AT_CSQ = 2,
-	AT_CREG_QUERY = 3,
-	AT_CGREG_QUERY = 4,
-	AT_CGDCONT = 5,
-//	AT_CGACT,
-	AT_CNTP_SET = 6,
-	AT_CNTP_GET = 7,
-	AT_CCLK = 8,
-	AT_NETOPEN = 9,
-	AT_CDNSCFG = 10,
-	AT_CDNSGIP = 11,
-	AT_CIPRXGET_SET = 12,
-	AT_CIPOPEN = 13,
-	AT_CIPSEND = 14,
-	AT_SEND = 15, //> send data
-	AT_CIPRXGET_READ = 16, //AT+CIPRXGET=3,1,12
-	AT_CIPCLOSE = 17,
+	AT_CREG = 0, AT_CGREG, // =1,
+	AT_CPSI, //=2
+	AT_CSQ, // =3,
+	AT_CREG_QUERY, // = 4,
+	AT_CGREG_QUERY, // = 5,
+	AT_CGDCONT, // = 6,
+	AT_CNTP_SET, // = 7,
+	AT_CNTP_GET, // = 8,
+	AT_CCLK, // = 9,
+	AT_NETOPEN, // = 10,
+	AT_CDNSCFG, // = 11,
+	AT_CDNSGIP, // = 12,
+	AT_CIPRXGET_SET, // = 13,
+	AT_CIPOPEN, // = 14,
+	AT_CIPSEND, // = 15,
+	AT_SEND, // = 16, //> send data
+	AT_CIPRXGET_READ, // = 17, //AT+CIPRXGET=3,1,12
+	AT_CIPCLOSE, // = 18,
 	AT_MAX_SEQ,
 
 } ATSequence_t;
@@ -705,6 +704,10 @@ static void Send_Cellular_Command_Req(void *arg) {
 	case AT_CGREG: //AT+CGREG=1
 		const char *cmd1 = "AT+CGREG=1\r\n";
 		GSM_Uart_Transmit((uint8_t*) cmd1, strlen(cmd1));
+		break;
+	case AT_CPSI: //AT+CPSI?
+		const char *cmd_cpsi = "AT+CPSI?\r\n";
+		GSM_Uart_Transmit((uint8_t*) cmd_cpsi, strlen(cmd_cpsi));
 		break;
 	case AT_CSQ: //AT+CSQ
 		const char *cmd2 = "AT+CSQ\r\n";
