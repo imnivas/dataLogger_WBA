@@ -84,6 +84,7 @@ static void (*RxCpltCallbackhlp1)(uint8_t *rxChar, uint16_t size, uint8_t error)
 
 #define MODEM_AT_READY      "*ATREADY: 1"
 #define MODEM_CPIN_READY    "+CPIN: READY"
+#define MODEM_CPIN_SIM_REMOVED    "+CPIN: SIM REMOVED"
 #define MODEM_SMS_DONE      "SMS DONE"
 #define MODEM_CGEV		    "+CGEV"
 #define MODEM_CSQ 		    "+CSQ"
@@ -105,6 +106,7 @@ static void (*RxCpltCallbackhlp1)(uint8_t *rxChar, uint16_t size, uint8_t error)
 
 void modem_at_ready(const char *param);
 void modem_sim_ready(const char *param);
+void modem_sim_removed(const char *param);
 void modem_sms_ready(const char *param);
 void modem_cgev(const char *param);
 void modem_ok_resp(const char *param);
@@ -161,6 +163,9 @@ static const struct ATResponse_s ATResponse[] = {
 		//
 		{ .string = MODEM_CPIN_READY, .size_string = sizeof(MODEM_CPIN_READY)
 				- 1, .set = do_nothing, .run = modem_sim_ready },
+		//
+		{ .string = MODEM_CPIN_SIM_REMOVED, .size_string = sizeof(MODEM_CPIN_SIM_REMOVED)
+				- 1, .set = do_nothing, .run = modem_sim_removed },
 		//
 		{ .string = MODEM_SMS_DONE, .size_string = sizeof(MODEM_CPIN_READY) - 1,
 				.set = do_nothing, .run = modem_sms_ready },
@@ -277,6 +282,14 @@ void modem_sim_ready(const char *param) {
 	modem_status.is_sim_ready = 1;
 	LOG_INFO_APP("Modem is sim ready\r\n");
 	check_modem_status();
+}
+
+void modem_sim_removed(const char *param) {
+
+	modem_status.is_sim_ready = 1;
+	LOG_INFO_APP("Modem has No SIM\r\n");
+	Send_Data_Done();
+
 }
 
 void modem_sms_ready(const char *param) {

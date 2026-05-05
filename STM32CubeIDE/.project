@@ -315,6 +315,11 @@
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/ramcfg.c</locationURI>
 		</link>
 		<link>
+			<name>Application/User/Core/rng.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/rng.c</locationURI>
+		</link>
+		<link>
 			<name>Application/User/Core/rtc.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/rtc.c</locationURI>
