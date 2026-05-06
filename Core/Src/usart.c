@@ -69,6 +69,10 @@ void MX_LPUART1_UART_Init(void)
   {
     Error_Handler();
   }
+  if (HAL_RS485Ex_Init(&hlpuart1, UART_DE_POLARITY_HIGH, 0, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN LPUART1_Init 2 */
 
   /* USER CODE END LPUART1_Init 2 */
@@ -190,8 +194,9 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     /**LPUART1 GPIO Configuration
     PA2     ------> LPUART1_TX
     PA1     ------> LPUART1_RX
+    PA9     ------> LPUART1_DE
     */
-    GPIO_InitStruct.Pin = SLAVE_TX_Pin|SLAVE_RX_Pin;
+    GPIO_InitStruct.Pin = SLAVE_TX_Pin|SLAVE_RX_Pin|SLAVE_RS485_DE_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -355,8 +360,9 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
     /**LPUART1 GPIO Configuration
     PA2     ------> LPUART1_TX
     PA1     ------> LPUART1_RX
+    PA9     ------> LPUART1_DE
     */
-    HAL_GPIO_DeInit(GPIOA, SLAVE_TX_Pin|SLAVE_RX_Pin);
+    HAL_GPIO_DeInit(GPIOA, SLAVE_TX_Pin|SLAVE_RX_Pin|SLAVE_RS485_DE_Pin);
 
   /* USER CODE BEGIN LPUART1_MspDeInit 1 */
 

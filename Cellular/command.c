@@ -67,13 +67,6 @@ int data_register_retry = 5;
 int cip_close = -1;
 uint32_t timer_period_modem_init_ms = 60000;
 uint32_t timer_period_modem_cmd_ms = 200;
-uint8_t dataToSend[] = { 0x90, 0x1c, 0xae, 0x8d, 0x2a, 0xe1, 0x81, 0x11, 0x11,
-		0x00, 0x98, 0x50, 0x01, 0x00, 0x18, 0x00, 0x62, 0x63, 0xef, 0x68, 0x01,
-		0xa6, 0x9e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0d, 0xcc, 0x00, 0x08, 0x04, 0xb1,
-		0x00, 0x20, 0x2f, 0xfc, 0x01, 0x08, 0x00, 0x00, 0x00, 0x00, 0x70, 0x67,
-		0x00, 0x20, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x14,
-		0x6b, 0xfe, 0xa5, 0x2d, 0x01, 0x08, 0x83, 0x2e, 0xcc, 0x00 };
 
 #define CMD_SIZE                        540
 #define CIRC_BUFF_SIZE                  50
@@ -447,6 +440,7 @@ void modem_cipopen(const char *param) {
 			LOG_INFO_APP(
 					"Modem CIPOPEN connection %d failed with status %d\r\n",
 					conn_id, status);
+					Send_Data_Done();
 		}
 	} else {
 		LOG_INFO_APP("Modem CIPOPEN parse error\r\n");
@@ -468,6 +462,7 @@ void modem_cipsend(const char *param) {
 			LOG_INFO_APP(
 					"Modem CIPSEND connection %d failed to send data, req length %d, cnf length %d\r\n",
 					conn_id, reqSendLength, cnfSendLength);
+					Send_Data_Done();
 		}
 	} else {
 		LOG_INFO_APP("Modem CIPSEND parse error\r\n");
@@ -764,7 +759,7 @@ static void Send_Cellular_Command_Req(void *arg) {
 	case AT_CDNSGIP: //AT+CDNSGIP="
 		const char *cmd8 = "AT+CDNSGIP=\"%s\"\r\n";
 		char ATCDNSGIP[50];
-		tsnprintf(ATCDNSGIP, sizeof(ATCDNSGIP), cmd8, "datalogger.adarko.io");
+		tsnprintf(ATCDNSGIP, sizeof(ATCDNSGIP), cmd8, "databridge.adarko.io");
 		GSM_Uart_Transmit((uint8_t*) ATCDNSGIP, strlen(ATCDNSGIP));
 		break;
 	case AT_CIPRXGET_SET: //AT+CIPRXGET=1
@@ -774,18 +769,18 @@ static void Send_Cellular_Command_Req(void *arg) {
 	case AT_CIPOPEN: //AT+CIPOPEN=0,"TCP","datalogger.adarko.io",80
 		char ATCIPOPEN[100];
 		tsnprintf(ATCIPOPEN, sizeof(ATCIPOPEN),
-				"AT+CIPOPEN=1,\"TCP\",\"%s\",%d\r\n", "datalogger.adarko.io",
+				"AT+CIPOPEN=1,\"TCP\",\"%s\",%d\r\n", "databridge.adarko.io",
 				8900);
 		GSM_Uart_Transmit((uint8_t*) ATCIPOPEN, strlen(ATCIPOPEN));
 		break;
 	case AT_CIPSEND: //AT+CIPSEND=1,size
 		const char *cmd11 = "AT+CIPSEND=1,%d\r\n";
 		char ATCIPSEND[50];
-		tsnprintf(ATCIPSEND, sizeof(ATCIPSEND), cmd11, sizeof(dataToSend));
+		tsnprintf(ATCIPSEND, sizeof(ATCIPSEND), cmd11, sizeof(pzem_payload));
 		GSM_Uart_Transmit((uint8_t*) ATCIPSEND, strlen(ATCIPSEND));
 		break;
 	case AT_SEND: //send data
-		GSM_Uart_Transmit(dataToSend, sizeof(dataToSend));
+		GSM_Uart_Transmit(pzem_payload, sizeof(pzem_payload));
 		break;
 	case AT_CIPRXGET_READ: //AT+CIPRXGET=3,1,12
 		const char *cmd12 = "AT+CIPRXGET=3,1,12\r\n";

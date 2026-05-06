@@ -25,6 +25,7 @@
 #include "gpdma.h"
 #include "icache.h"
 #include "ramcfg.h"
+#include "rng.h"
 #include "crc_ctrl.h"
 #if (USE_TEMPERATURE_BASED_RADIO_CALIBRATION == 1)
 #include "adc_ctrl.h"
@@ -43,6 +44,7 @@ extern DMA_HandleTypeDef handle_GPDMA1_Channel0;
 extern UART_HandleTypeDef hlpuart1;
 extern UART_HandleTypeDef huart1;
 extern RAMCFG_HandleTypeDef hramcfg_SRAM1;
+extern RNG_HandleTypeDef hrng;
 
 /* USER CODE BEGIN EV */
 

@@ -91,6 +91,8 @@ void Error_Handler(void);
 #define CELLULAR_RX_GPIO_Port GPIOA
 #define CELLULAR_ANT_SW_Pin GPIO_PIN_15
 #define CELLULAR_ANT_SW_GPIO_Port GPIOB
+#define SLAVE_RS485_DE_Pin GPIO_PIN_9
+#define SLAVE_RS485_DE_GPIO_Port GPIOA
 #define BOOST_MODE_ON_Pin GPIO_PIN_14
 #define BOOST_MODE_ON_GPIO_Port GPIOB
 
