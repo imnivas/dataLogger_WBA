@@ -32,6 +32,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "app_bsp.h"
+#include "application.h"
+#include <string.h>
 
 /* USER CODE END Includes */
 
@@ -122,21 +124,24 @@ void P2P_SERVER_Notification(P2P_SERVER_NotificationEvt_t *p_Notification)
 
     case P2P_SERVER_LED_C_WRITE_NO_RESP_EVT:
       /* USER CODE BEGIN Service1Char1_WRITE_NO_RESP_EVT */
-      if(p_Notification->DataTransfered.p_Payload[1] == 0x01)
+      if(p_Notification->DataTransfered.Length == sizeof(AppConfig_t))
       {
-        #if (CFG_LED_SUPPORTED == 1)
-        BSP_LED_On(LED_BLUE);
-        #endif
-        LOG_INFO_APP("-- P2P APPLICATION SERVER : LED1 ON\n");
-        P2P_SERVER_APP_Context.LedControl.Led1 = 0x01; /* LED1 ON */
+        const AppConfig_t *incoming = (const AppConfig_t *)p_Notification->DataTransfered.p_Payload;
+        if(incoming->magic == APP_CONFIG_MAGIC)
+        {
+          memcpy(&app_config, incoming, sizeof(AppConfig_t));
+          AppConfig_Save();
+          LOG_INFO_APP("-- P2P : AppConfig received and saved\n");
+        }
+        else
+        {
+          LOG_INFO_APP("-- P2P : AppConfig bad magic, ignored\n");
+        }
       }
-      if(p_Notification->DataTransfered.p_Payload[1] == 0x00)
+      else
       {
-        #if (CFG_LED_SUPPORTED == 1)
-        BSP_LED_Off(LED_BLUE);
-        #endif
-        LOG_INFO_APP("-- P2P APPLICATION SERVER : LED1 OFF\n");
-        P2P_SERVER_APP_Context.LedControl.Led1 = 0x00; /* LED1 OFF */
+        LOG_INFO_APP("-- P2P : AppConfig wrong length %d (expected %d)\n",
+                     p_Notification->DataTransfered.Length, sizeof(AppConfig_t));
       }
       /* USER CODE END Service1Char1_WRITE_NO_RESP_EVT */
       break;

@@ -6,6 +6,7 @@
  */
 
 #include "application.h"
+#include "flash_manager.h"
 #include "cellular.h"
 #include "log_module.h"
 #include "stm32_seq.h"
@@ -24,6 +25,73 @@ typedef struct {
 static ApplicationContext_t applicationContext;
 
 uint8_t pzem_payload[20] = {0};
+AppConfig_t app_config;
+
+/* ---- AppConfig flash callbacks (pattern from ota_app.c) ----------------- */
+static void FM_Config_WriteCallback(FM_FlashOp_Status_t status)
+{
+    if (status == FM_OPERATION_COMPLETE)
+        LOG_INFO_APP("AppConfig: flash write complete\r\n");
+    else
+        LOG_INFO_APP("AppConfig: flash write error\r\n");
+}
+
+static FM_CallbackNode_t fm_write_cb_node = {
+    .NodeList = { .next = NULL, .prev = NULL },
+    .Callback = FM_Config_WriteCallback
+};
+
+static void FM_Config_EraseCallback(FM_FlashOp_Status_t status)
+{
+    if (status == FM_OPERATION_COMPLETE) {
+        LOG_INFO_APP("AppConfig: erase done, writing\r\n");
+        FM_Write((uint32_t *)&app_config,
+                 (uint32_t *)APP_CONFIG_FLASH_ADDR,
+                 sizeof(AppConfig_t) / 4,
+                 &fm_write_cb_node);
+    } else {
+        LOG_INFO_APP("AppConfig: flash erase error\r\n");
+    }
+}
+
+static FM_CallbackNode_t fm_erase_cb_node = {
+    .NodeList = { .next = NULL, .prev = NULL },
+    .Callback = FM_Config_EraseCallback
+};
+
+static void AppConfig_ApplyDefaults(void)
+{
+    memset(&app_config, 0, sizeof(app_config));
+    app_config.magic            = APP_CONFIG_MAGIC;
+    app_config.version          = APP_CONFIG_VERSION;
+    strncpy(app_config.apn,         "airtelgprs.com",       sizeof(app_config.apn) - 1);
+    strncpy(app_config.server_addr, "databridge.adarko.io", sizeof(app_config.server_addr) - 1);
+    app_config.server_port      = 8900;
+    app_config.modbus_slave_id  = 2;
+    app_config.send_interval_mins = 60;
+}
+
+void AppConfig_Load(void)
+{
+    const AppConfig_t *f = (const AppConfig_t *)APP_CONFIG_FLASH_ADDR;
+    if (f->magic == APP_CONFIG_MAGIC) {
+        memcpy(&app_config, f, sizeof(AppConfig_t));
+        LOG_INFO_APP("AppConfig: loaded from flash\r\n");
+    } else {
+        AppConfig_ApplyDefaults();
+		AppConfig_Save();
+        LOG_INFO_APP("AppConfig: defaults applied\r\n");
+    }
+}
+
+void AppConfig_Save(void)
+{
+    app_config.magic   = APP_CONFIG_MAGIC;
+    app_config.version = APP_CONFIG_VERSION;
+    FM_Erase(APP_CONFIG_FLASH_SECTOR, 1, &fm_erase_cb_node);
+}
+
+/* ------------------------------------------------------------------------- */
 
 static void Send_Data_Req(void *arg);
 static void Send_Data(void);
@@ -32,6 +100,7 @@ void MeterReadProcessInit(void);
 void UserApplicationInit(void) {
 	LOG_INFO_APP("UserApplication Init\n");
 
+	AppConfig_Load();
 
 	UTIL_SEQ_RegTask(1U << CFG_TASK_CELLULAR_SEND_DATA, UTIL_SEQ_RFU,
 			Send_Data);
@@ -39,7 +108,9 @@ void UserApplicationInit(void) {
 	UTIL_TIMER_Create(&(applicationContext.SEND_Data_timer_Id), 0,
 			UTIL_TIMER_ONESHOT, &Send_Data_Req, 0);
 
-	UTIL_TIMER_StartWithPeriod(&applicationContext.SEND_Data_timer_Id, 5000);
+	/*First Data after boot will be in 5 Seconds*/
+	UTIL_TIMER_StartWithPeriod(&applicationContext.SEND_Data_timer_Id,
+			5000U);
 
 }
 
@@ -52,8 +123,22 @@ static void Send_Data_Req(void *arg) {
 
 }
 
+static uint16_t modbus_crc16(const uint8_t *data, uint16_t len)
+{
+	uint16_t crc = 0xFFFF;
+	for (uint16_t i = 0; i < len; i++) {
+		crc ^= data[i];
+		for (uint8_t j = 0; j < 8; j++)
+			crc = (crc & 1) ? (crc >> 1) ^ 0xA001 : crc >> 1;
+	}
+	return crc;
+}
+
 void RS485_ReadPZEM(void) {
-	static const uint8_t modbus_req[8] = {0x02, 0x04, 0x00, 0x00, 0x00, 0x0A, 0x70, 0x3E};
+	uint8_t modbus_req[8] = {app_config.modbus_slave_id, 0x04, 0x00, 0x00, 0x00, 0x0A, 0x00, 0x00};
+	uint16_t crc = modbus_crc16(modbus_req, 6);
+	modbus_req[6] = crc & 0xFF;
+	modbus_req[7] = (crc >> 8) & 0xFF;
 	uint8_t buf[25] = {0};
 
 	HAL_GPIO_WritePin(SLAVE_SW_GPIO_Port, SLAVE_SW_Pin, GPIO_PIN_SET);
@@ -67,7 +152,7 @@ void RS485_ReadPZEM(void) {
 	HAL_UART_Transmit(&hlpuart1, (uint8_t *)modbus_req, sizeof(modbus_req), 100);
 
 	if (HAL_UART_Receive(&hlpuart1, buf, sizeof(buf), 500) == HAL_OK) {
-		if (buf[0] == 0x02 && buf[1] == 0x04 && buf[2] == 0x14) {
+		if (buf[0] == app_config.modbus_slave_id && buf[1] == 0x04 && buf[2] == 0x14) {
 			memcpy(pzem_payload, &buf[3], 20);
 			LOG_INFO_APP("PZEM-016 read OK\r\n");
 		} else {
@@ -98,6 +183,8 @@ static void Send_Data(void) {
 void Send_Data_Done(void){
    CellularDeInit();
    UTIL_LPM_SetStopMode(1U << CFG_LPM_APP, UTIL_LPM_ENABLE);
+   UTIL_TIMER_StartWithPeriod(&applicationContext.SEND_Data_timer_Id,
+			app_config.send_interval_mins * 60000U);
 }
 
 

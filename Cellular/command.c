@@ -733,11 +733,10 @@ static void Send_Cellular_Command_Req(void *arg) {
 		const char *cmd_cclk = "AT+CCLK?\r\n";
 		GSM_Uart_Transmit((uint8_t*) cmd_cclk, strlen(cmd_cclk));
 		break;
-	case AT_CGDCONT: //AT+CGDCONT=1,"IP","airtel"
-		//const char *cmd5 = "AT+CGDCONT=1,\"IP\",\"%s\"\r\n";
+	case AT_CGDCONT: //AT+CGDCONT=1,"IP","<apn>"
 		char ATCGDCONT[50];
 		tsnprintf(ATCGDCONT, sizeof(ATCGDCONT),
-				"AT+CGDCONT=1,\"ip\",\"%s\"\r\n", "airtelgprs.com");
+				"AT+CGDCONT=1,\"ip\",\"%s\"\r\n", app_config.apn);
 		GSM_Uart_Transmit((uint8_t*) ATCGDCONT, strlen(ATCGDCONT));
 		break;
 	case AT_CNTP_SET: //AT+CNTP="time.nist.gov",123
@@ -759,18 +758,18 @@ static void Send_Cellular_Command_Req(void *arg) {
 	case AT_CDNSGIP: //AT+CDNSGIP="
 		const char *cmd8 = "AT+CDNSGIP=\"%s\"\r\n";
 		char ATCDNSGIP[50];
-		tsnprintf(ATCDNSGIP, sizeof(ATCDNSGIP), cmd8, "databridge.adarko.io");
+		tsnprintf(ATCDNSGIP, sizeof(ATCDNSGIP), cmd8, app_config.server_addr);
 		GSM_Uart_Transmit((uint8_t*) ATCDNSGIP, strlen(ATCDNSGIP));
 		break;
 	case AT_CIPRXGET_SET: //AT+CIPRXGET=1
 		const char *cmd9 = "AT+CIPRXGET=1\r\n";
 		GSM_Uart_Transmit((uint8_t*) cmd9, strlen(cmd9));
 		break;
-	case AT_CIPOPEN: //AT+CIPOPEN=0,"TCP","datalogger.adarko.io",80
+	case AT_CIPOPEN: //AT+CIPOPEN=1,"TCP","<server>",<port>
 		char ATCIPOPEN[100];
 		tsnprintf(ATCIPOPEN, sizeof(ATCIPOPEN),
-				"AT+CIPOPEN=1,\"TCP\",\"%s\",%d\r\n", "databridge.adarko.io",
-				8900);
+				"AT+CIPOPEN=1,\"TCP\",\"%s\",%d\r\n", app_config.server_addr,
+				app_config.server_port);
 		GSM_Uart_Transmit((uint8_t*) ATCIPOPEN, strlen(ATCIPOPEN));
 		break;
 	case AT_CIPSEND: //AT+CIPSEND=1,size
