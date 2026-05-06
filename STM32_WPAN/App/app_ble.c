@@ -181,12 +181,12 @@ static BleApplicationContext_t bleAppContext;
 P2P_SERVER_APP_ConnHandleNotEvt_t P2P_SERVERHandleNotification;
 OTA_APP_ConnHandleNotEvt_t OTAHandleNotification;
 
-static char a_GapDeviceName[] = {  'P', 'e', 'e', 'r', ' ', 't', 'o', ' ', 'P', 'e', 'e', 'r', ' ', 'S', 'e', 'r', 'v', 'e', 'r' }; /* Gap Device Name */
+static char a_GapDeviceName[] = {  'D', 'L', 'X', 'X', 'X', 'X', 'X', 'X' }; /* Gap Device Name */
 
 /* Advertising Data */
-uint8_t a_AdvData[25] =
+uint8_t a_AdvData[26] =
 {
-  8, AD_TYPE_COMPLETE_LOCAL_NAME, 'p', '2', 'p', 'S', '_', 'X', 'X',  /* Complete name */
+  9, AD_TYPE_COMPLETE_LOCAL_NAME, 'D', 'L', 'X', 'X', 'X', 'X', 'X', 'X',  /* Complete name */
   15, AD_TYPE_MANUFACTURER_SPECIFIC_DATA, 0x30, 0x00, 0x00 /*  */, 0x00 /*  */, 0x00 /*  */, 0x00 /*  */, 0x00 /*  */, 0x00 /*  */, 0x00 /*  */, 0x00 /*  */, 0x00 /*  */, 0x00 /*  */, 0x00 /*  */, 0x00 /*  */,
 };
 
@@ -1251,7 +1251,53 @@ static void Ble_Hci_Gap_Gatt_Init(void)
   role |= GAP_PERIPHERAL_ROLE;
 
   /* USER CODE BEGIN Role_Mngt */
+uint8_t bd_addr_5, bd_addr_4, bd_addr_3, bd_addr_2, bd_addr_1, bd_addr_0;
 
+  	uint8_t a_GapDeviceName_Length = sizeof(a_GapDeviceName) - 1;
+
+  	bd_addr_5 = ((p_bd_addr[2] & 0xF0) >> 4);
+  	bd_addr_4 = (p_bd_addr[2] & 0xF);
+  	bd_addr_3 = ((p_bd_addr[1] & 0xF0) >> 4);
+  	bd_addr_2 = (p_bd_addr[1] & 0xF);
+  	bd_addr_1 = ((p_bd_addr[0] & 0xF0) >> 4);
+  	bd_addr_0 = (p_bd_addr[0] & 0xF);
+
+  	/* Convert hex value into ascii */
+  	if (bd_addr_5 > 0x09) {
+  		a_GapDeviceName[a_GapDeviceName_Length - 5] = bd_addr_5 + '7';
+  	} else {
+  		a_GapDeviceName[a_GapDeviceName_Length - 5] = bd_addr_5 + '0';
+  	}
+
+  	if (bd_addr_4 > 0x09) {
+  		a_GapDeviceName[a_GapDeviceName_Length - 4] = bd_addr_4 + '7';
+  	} else {
+  		a_GapDeviceName[a_GapDeviceName_Length - 4] = bd_addr_4 + '0';
+  	}
+
+  	if (bd_addr_3 > 0x09) {
+  		a_GapDeviceName[a_GapDeviceName_Length - 3] = bd_addr_3 + '7';
+  	} else {
+  		a_GapDeviceName[a_GapDeviceName_Length - 3] = bd_addr_3 + '0';
+  	}
+
+  	if (bd_addr_2 > 0x09) {
+  		a_GapDeviceName[a_GapDeviceName_Length - 2] = bd_addr_2 + '7';
+  	} else {
+  		a_GapDeviceName[a_GapDeviceName_Length - 2] = bd_addr_2 + '0';
+  	}
+
+  	if (bd_addr_1 > 0x09) {
+  		a_GapDeviceName[a_GapDeviceName_Length - 1] = bd_addr_1 + '7';
+  	} else {
+  		a_GapDeviceName[a_GapDeviceName_Length - 1] = bd_addr_1 + '0';
+  	}
+
+  	if (bd_addr_0 > 0x09) {
+  		a_GapDeviceName[a_GapDeviceName_Length] = bd_addr_0 + '7';
+  	} else {
+  		a_GapDeviceName[a_GapDeviceName_Length] = bd_addr_0 + '0';
+  	}
   /* USER CODE END Role_Mngt */
 
   if (role > 0)
@@ -1556,14 +1602,14 @@ static const uint8_t* BleGenerateBdAddress(void)
     /**
      * Public Address with the ST company ID
      * bit[47:24] : 24bits (OUI) equal to the company ID
-     * bit[23:16] : Device ID.
+     * bit[23:16] : UDN[23:16].
      * bit[15:0] : The last 16bits from the UDN
      * Note: In order to use the Public Address in a final product, a dedicated
      * 24bits company ID (OUI) shall be bought.
      */
       a_BdAddr[0] = (uint8_t)(udn & 0x000000FF);
       a_BdAddr[1] = (uint8_t)((udn & 0x0000FF00) >> 8);
-      a_BdAddr[2] = (uint8_t)device_id;
+      a_BdAddr[2] = (uint8_t)((udn >> 16) & 0xFF);
       a_BdAddr[3] = (uint8_t)(company_id & 0x000000FF);
       a_BdAddr[4] = (uint8_t)((company_id & 0x0000FF00) >> 8);
       a_BdAddr[5] = (uint8_t)((company_id & 0x00FF0000) >> 16);
@@ -1896,7 +1942,8 @@ void APP_BSP_Button3Action(void)
 static void fill_advData(uint8_t *p_adv_data, uint8_t tab_size, const uint8_t* p_bd_addr)
 {
   uint16_t i =0;
-  uint8_t bd_addr_1, bd_addr_0;
+  // uint8_t bd_addr_1, bd_addr_0;
+  uint8_t bd_addr_5, bd_addr_4, bd_addr_3, bd_addr_2, bd_addr_1, bd_addr_0;
   uint8_t ad_length, ad_type;
 
   while(i < tab_size)
@@ -1917,30 +1964,82 @@ static void fill_advData(uint8_t *p_adv_data, uint8_t tab_size, const uint8_t* p
       break;
     case AD_TYPE_COMPLETE_LOCAL_NAME:
       {
-        if((p_adv_data[i + ad_length] == 'X') && (p_adv_data[i + ad_length - 1] == 'X'))
-        {
-          bd_addr_1 = ((p_bd_addr[0] & 0xF0)>>4);
-          bd_addr_0 = (p_bd_addr[0] & 0xF);
+        //        if((p_adv_data[i + ad_length] == 'X') && (p_adv_data[i + ad_length - 1] == 'X'))
+//        {
+//          bd_addr_1 = ((p_bd_addr[0] & 0xF0)>>4);
+//          bd_addr_0 = (p_bd_addr[0] & 0xF);
+//
+//          /* Convert hex value into ascii */
+//          if(bd_addr_1 > 0x09)
+//          {
+//            p_adv_data[i + ad_length - 1] = bd_addr_1 + '7';
+//          }
+//          else
+//          {
+//            p_adv_data[i + ad_length - 1] = bd_addr_1 + '0';
+//          }
+//
+//          if(bd_addr_0 > 0x09)
+//          {
+//            p_adv_data[i + ad_length] = bd_addr_0 + '7';
+//          }
+//          else
+//          {
+//            p_adv_data[i + ad_length] = bd_addr_0 + '0';
+//          }
+//        }
+//        break;
+    	  if ((p_adv_data[i + ad_length] == 'X')
+    	  					&& (p_adv_data[i + ad_length - 1] == 'X')
+    	  					&& (p_adv_data[i + ad_length - 2] == 'X')
+    	  					&& (p_adv_data[i + ad_length - 3] == 'X')
+    	  					&& (p_adv_data[i + ad_length - 4] == 'X')
+    	  					&& (p_adv_data[i + ad_length - 5] == 'X')) {
+    	  				bd_addr_5 = ((p_bd_addr[2] & 0xF0) >> 4);
+    	  				bd_addr_4 = (p_bd_addr[2] & 0xF);
+    	  				bd_addr_3 = ((p_bd_addr[1] & 0xF0) >> 4);
+    	  				bd_addr_2 = (p_bd_addr[1] & 0xF);
+    	  				bd_addr_1 = ((p_bd_addr[0] & 0xF0) >> 4);
+    	  				bd_addr_0 = (p_bd_addr[0] & 0xF);
 
-          /* Convert hex value into ascii */
-          if(bd_addr_1 > 0x09)
-          {
-            p_adv_data[i + ad_length - 1] = bd_addr_1 + '7';
-          }
-          else
-          {
-            p_adv_data[i + ad_length - 1] = bd_addr_1 + '0';
-          }
+    	  				/* Convert hex value into ascii */
+    	  				if (bd_addr_5 > 0x09) {
+    	  					p_adv_data[i + ad_length - 5] = bd_addr_5 + '7';
+    	  				} else {
+    	  					p_adv_data[i + ad_length - 5] = bd_addr_5 + '0';
+    	  				}
 
-          if(bd_addr_0 > 0x09)
-          {
-            p_adv_data[i + ad_length] = bd_addr_0 + '7';
-          }
-          else
-          {
-            p_adv_data[i + ad_length] = bd_addr_0 + '0';
-          }
-        }
+    	  				if (bd_addr_4 > 0x09) {
+    	  					p_adv_data[i + ad_length - 4] = bd_addr_4 + '7';
+    	  				} else {
+    	  					p_adv_data[i + ad_length - 4] = bd_addr_4 + '0';
+    	  				}
+
+    	  				if (bd_addr_3 > 0x09) {
+    	  					p_adv_data[i + ad_length - 3] = bd_addr_3 + '7';
+    	  				} else {
+    	  					p_adv_data[i + ad_length - 3] = bd_addr_3 + '0';
+    	  				}
+
+    	  				if (bd_addr_2 > 0x09) {
+    	  					p_adv_data[i + ad_length - 2] = bd_addr_2 + '7';
+    	  				} else {
+    	  					p_adv_data[i + ad_length - 2] = bd_addr_2 + '0';
+    	  				}
+
+    	  				if (bd_addr_1 > 0x09) {
+    	  					p_adv_data[i + ad_length - 1] = bd_addr_1 + '7';
+    	  				} else {
+    	  					p_adv_data[i + ad_length - 1] = bd_addr_1 + '0';
+    	  				}
+
+    	  				if (bd_addr_0 > 0x09) {
+    	  					p_adv_data[i + ad_length] = bd_addr_0 + '7';
+    	  				} else {
+    	  					p_adv_data[i + ad_length] = bd_addr_0 + '0';
+    	  				}
+    	  			}
+    	  			break;
         break;
       }
     case AD_TYPE_MANUFACTURER_SPECIFIC_DATA:

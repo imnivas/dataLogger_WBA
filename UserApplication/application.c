@@ -7,6 +7,7 @@
 
 #include "application.h"
 #include "flash_manager.h"
+#include "ll_sys_if.h"
 #include "cellular.h"
 #include "log_module.h"
 #include "stm32_seq.h"
@@ -16,6 +17,7 @@
 #include "usart.h"
 #include <stdint.h>
 #include <string.h>
+#include "app_ble.h"
 
 typedef struct {
 	UTIL_TIMER_Object_t SEND_Data_timer_Id;
@@ -93,6 +95,56 @@ void AppConfig_Save(void)
 
 /* ------------------------------------------------------------------------- */
 
+static void Log_EUI64(void)
+{
+    uint32_t udn        = LL_FLASH_GetUDN();
+    uint32_t company_id = LL_FLASH_GetSTCompanyID();
+    uint32_t device_id  = LL_FLASH_GetDeviceID();
+
+    if (udn == 0xFFFFFFFF) {
+        LOG_INFO_APP("EUI-64: UDN not programmed, cannot generate\r\n");
+        return;
+    }
+
+    /* Reconstruct BD address — same formula as app_ble.c BleGenerateBdAddress */
+    uint8_t bd[6];
+    bd[0] = (uint8_t)(udn & 0xFF);
+    bd[1] = (uint8_t)((udn >> 8) & 0xFF);
+    bd[2] = (uint8_t)((udn >> 16) & 0xFF);
+    bd[3] = (uint8_t)(company_id & 0xFF);
+    bd[4] = (uint8_t)((company_id >> 8) & 0xFF);
+    bd[5] = (uint8_t)((company_id >> 16) & 0xFF);
+
+    /*
+     * ST EUI-64 (matches STM32WL GetUniqueId pattern):
+     *   id[0] = CompanyID[23:16]  (MSB)
+     *   id[1] = CompanyID[15:8]
+     *   id[2] = CompanyID[7:0]
+     *   id[3] = DeviceID[7:0]
+     *   id[4] = UDN[31:24]
+     *   id[5] = UDN[23:16]
+     *   id[6] = UDN[15:8]
+     *   id[7] = UDN[7:0]          (LSB)
+     */
+    uint8_t eui64[8];
+    eui64[0] = (uint8_t)((company_id >> 16) & 0xFF);
+    eui64[1] = (uint8_t)((company_id >> 8)  & 0xFF);
+    eui64[2] = (uint8_t)(company_id & 0xFF);
+    eui64[3] = (uint8_t)(device_id & 0xFF);
+    eui64[4] = (uint8_t)((udn >> 24) & 0xFF);
+    eui64[5] = (uint8_t)((udn >> 16) & 0xFF);
+    eui64[6] = (uint8_t)((udn >> 8)  & 0xFF);
+    eui64[7] = (uint8_t)(udn & 0xFF);
+
+    LOG_INFO_APP("BD  Addr : %02X:%02X:%02X:%02X:%02X:%02X\r\n",
+                 bd[5], bd[4], bd[3], bd[2], bd[1], bd[0]);
+    LOG_INFO_APP("EUI-64   : %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\r\n",
+                 eui64[0], eui64[1], eui64[2], eui64[3],
+                 eui64[4], eui64[5], eui64[6], eui64[7]);
+    LOG_INFO_APP("UDN: %08lX  CompanyID: %06lX  DeviceID: %02lX\r\n",
+                 (unsigned long)udn, (unsigned long)company_id, (unsigned long)device_id);
+}
+
 static void Send_Data_Req(void *arg);
 static void Send_Data(void);
 void MeterReadProcessInit(void);
@@ -100,7 +152,16 @@ void MeterReadProcessInit(void);
 void UserApplicationInit(void) {
 	LOG_INFO_APP("UserApplication Init\n");
 
+	//Call BleGetBdAddress and log the generated BD address before loading AppConfig, to verify that BD address generation does not depend on AppConfig values
+	const uint8_t *bd_addr = BleGetBdAddress();
+	LOG_INFO_APP("Generated BD Address: %02X:%02X:%02X:%02X:%02X:%02X\r\n",
+			bd_addr[5], bd_addr[4], bd_addr[3], bd_addr[2], bd_addr[1], bd_addr[0]);	
+	//generate EUI-64 and log it as well, by appending LL_FLASH_GetSTCompanyID and LL_FLASH_GetDeviceID to the BD address, to verify that EUI-64 generation is correct and does not depend on AppConfig values
+
+		
+
 	AppConfig_Load();
+	Log_EUI64();
 
 	UTIL_SEQ_RegTask(1U << CFG_TASK_CELLULAR_SEND_DATA, UTIL_SEQ_RFU,
 			Send_Data);
