@@ -22,6 +22,7 @@
 #include "adc_ctrl_conf.h"
 #include "temp_measurement.h"
 #include "stm32wbaxx_ll_adc.h"
+#include "stm32_systime.h"
 
 typedef struct {
 	UTIL_TIMER_Object_t SEND_Data_timer_Id;
@@ -165,6 +166,9 @@ void UserApplicationInit(void) {
 
 	AppConfig_Load();
 	Log_EUI64();
+	SysTime_t sysTime = SysTimeGet();
+	LOG_INFO_APP("SysTime: %lu s  SubSeconds: %d\r\n",
+	             (unsigned long)sysTime.Seconds, sysTime.SubSeconds);
     LOG_INFO_APP("Firmware Version: 0x%04X\r\n", APP_CONFIG_FIRMWARE_VERSION);
     LOG_INFO_APP("Hardware Version: 0x%04X\r\n", APP_CONFIG_HARDWARE_VERSION);
 
