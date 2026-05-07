@@ -18,6 +18,10 @@
 #include <stdint.h>
 #include <string.h>
 #include "app_ble.h"
+#include "adc_ctrl.h"
+#include "adc_ctrl_conf.h"
+#include "temp_measurement.h"
+#include "stm32wbaxx_ll_adc.h"
 
 typedef struct {
 	UTIL_TIMER_Object_t SEND_Data_timer_Id;
@@ -27,6 +31,14 @@ typedef struct {
 static ApplicationContext_t applicationContext;
 
 uint8_t pzem_payload[20] = {0};
+
+Payload_t payload;
+static Packet_t  tcp_packet;
+static uint8_t   tcp_payload_buf[MAX_PAYLOAD_SIZE];
+static uint8_t   tx_buf[MAX_PACKET_BUF];
+static uint32_t  uplink_fcnt = 0;
+static uint32_t  downlink_fcnt = 0;
+
 AppConfig_t app_config;
 
 /* ---- AppConfig flash callbacks (pattern from ota_app.c) ----------------- */
@@ -61,16 +73,41 @@ static FM_CallbackNode_t fm_erase_cb_node = {
     .Callback = FM_Config_EraseCallback
 };
 
+void AppConfig_FillHwIds(void)
+{
+    uint32_t udn        = LL_FLASH_GetUDN();
+    uint32_t company_id = LL_FLASH_GetSTCompanyID();
+    uint32_t device_id  = LL_FLASH_GetDeviceID();
+
+    app_config.config.eui64[0] = (uint8_t)((company_id >> 16) & 0xFF);
+    app_config.config.eui64[1] = (uint8_t)((company_id >> 8)  & 0xFF);
+    app_config.config.eui64[2] = (uint8_t)(company_id & 0xFF);
+    app_config.config.eui64[3] = (uint8_t)(device_id & 0xFF);
+    app_config.config.eui64[4] = (uint8_t)((udn >> 24) & 0xFF);
+    app_config.config.eui64[5] = (uint8_t)((udn >> 16) & 0xFF);
+    app_config.config.eui64[6] = (uint8_t)((udn >> 8)  & 0xFF);
+    app_config.config.eui64[7] = (uint8_t)(udn & 0xFF);
+
+    /* BD address — same formula as app_ble.c BleGenerateBdAddress */
+    app_config.config.ble_addr[0] = (uint8_t)(udn & 0xFF);
+    app_config.config.ble_addr[1] = (uint8_t)((udn >> 8) & 0xFF);
+    app_config.config.ble_addr[2] = (uint8_t)((udn >> 16) & 0xFF);
+    app_config.config.ble_addr[3] = (uint8_t)(company_id & 0xFF);
+    app_config.config.ble_addr[4] = (uint8_t)((company_id >> 8) & 0xFF);
+    app_config.config.ble_addr[5] = (uint8_t)((company_id >> 16) & 0xFF);
+}
+
 static void AppConfig_ApplyDefaults(void)
 {
     memset(&app_config, 0, sizeof(app_config));
-    app_config.magic            = APP_CONFIG_MAGIC;
-    app_config.version          = APP_CONFIG_VERSION;
-    strncpy(app_config.apn,         "airtelgprs.com",       sizeof(app_config.apn) - 1);
-    strncpy(app_config.server_addr, "databridge.adarko.io", sizeof(app_config.server_addr) - 1);
-    app_config.server_port      = 8900;
-    app_config.modbus_slave_id  = 2;
-    app_config.send_interval_mins = 60;
+    app_config.magic                       = APP_CONFIG_MAGIC;
+    app_config.version                     = APP_CONFIG_VERSION;
+    app_config.config.frame_head           = USER_CONFIG_FRAME_HEAD;
+    strncpy(app_config.config.apn,         "airtelgprs.com",    sizeof(app_config.config.apn) - 1);
+    strncpy(app_config.config.server_addr, "platform.adarko.io", sizeof(app_config.config.server_addr) - 1);
+    app_config.config.server_port          = 8900;
+    app_config.config.modbus_slave_id      = 2;
+    app_config.config.send_interval_mins   = 60;
 }
 
 void AppConfig_Load(void)
@@ -84,6 +121,8 @@ void AppConfig_Load(void)
 		AppConfig_Save();
         LOG_INFO_APP("AppConfig: defaults applied\r\n");
     }
+    /* Always re-derive HW IDs from silicon — never trust stored values */
+    AppConfig_FillHwIds();
 }
 
 void AppConfig_Save(void)
@@ -97,52 +136,12 @@ void AppConfig_Save(void)
 
 static void Log_EUI64(void)
 {
-    uint32_t udn        = LL_FLASH_GetUDN();
-    uint32_t company_id = LL_FLASH_GetSTCompanyID();
-    uint32_t device_id  = LL_FLASH_GetDeviceID();
-
-    if (udn == 0xFFFFFFFF) {
-        LOG_INFO_APP("EUI-64: UDN not programmed, cannot generate\r\n");
-        return;
-    }
-
-    /* Reconstruct BD address — same formula as app_ble.c BleGenerateBdAddress */
-    uint8_t bd[6];
-    bd[0] = (uint8_t)(udn & 0xFF);
-    bd[1] = (uint8_t)((udn >> 8) & 0xFF);
-    bd[2] = (uint8_t)((udn >> 16) & 0xFF);
-    bd[3] = (uint8_t)(company_id & 0xFF);
-    bd[4] = (uint8_t)((company_id >> 8) & 0xFF);
-    bd[5] = (uint8_t)((company_id >> 16) & 0xFF);
-
-    /*
-     * ST EUI-64 (matches STM32WL GetUniqueId pattern):
-     *   id[0] = CompanyID[23:16]  (MSB)
-     *   id[1] = CompanyID[15:8]
-     *   id[2] = CompanyID[7:0]
-     *   id[3] = DeviceID[7:0]
-     *   id[4] = UDN[31:24]
-     *   id[5] = UDN[23:16]
-     *   id[6] = UDN[15:8]
-     *   id[7] = UDN[7:0]          (LSB)
-     */
-    uint8_t eui64[8];
-    eui64[0] = (uint8_t)((company_id >> 16) & 0xFF);
-    eui64[1] = (uint8_t)((company_id >> 8)  & 0xFF);
-    eui64[2] = (uint8_t)(company_id & 0xFF);
-    eui64[3] = (uint8_t)(device_id & 0xFF);
-    eui64[4] = (uint8_t)((udn >> 24) & 0xFF);
-    eui64[5] = (uint8_t)((udn >> 16) & 0xFF);
-    eui64[6] = (uint8_t)((udn >> 8)  & 0xFF);
-    eui64[7] = (uint8_t)(udn & 0xFF);
-
+    const uint8_t *e = app_config.config.eui64;
+    const uint8_t *b = app_config.config.ble_addr;
     LOG_INFO_APP("BD  Addr : %02X:%02X:%02X:%02X:%02X:%02X\r\n",
-                 bd[5], bd[4], bd[3], bd[2], bd[1], bd[0]);
+                 b[5], b[4], b[3], b[2], b[1], b[0]);
     LOG_INFO_APP("EUI-64   : %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\r\n",
-                 eui64[0], eui64[1], eui64[2], eui64[3],
-                 eui64[4], eui64[5], eui64[6], eui64[7]);
-    LOG_INFO_APP("UDN: %08lX  CompanyID: %06lX  DeviceID: %02lX\r\n",
-                 (unsigned long)udn, (unsigned long)company_id, (unsigned long)device_id);
+                 e[0], e[1], e[2], e[3], e[4], e[5], e[6], e[7]);
 }
 
 static void Send_Data_Req(void *arg);
@@ -162,6 +161,14 @@ void UserApplicationInit(void) {
 
 	AppConfig_Load();
 	Log_EUI64();
+
+	VREFMEAS_Init();
+	CAPMEAS_Init();
+	TEMPMEAS_Init();
+
+	tcp_packet.Data    = tcp_payload_buf;
+	payload.Buffer     = tx_buf;
+	payload.BufferSize = 0;
 
 	UTIL_SEQ_RegTask(1U << CFG_TASK_CELLULAR_SEND_DATA, UTIL_SEQ_RFU,
 			Send_Data);
@@ -196,7 +203,7 @@ static uint16_t modbus_crc16(const uint8_t *data, uint16_t len)
 }
 
 void RS485_ReadPZEM(void) {
-	uint8_t modbus_req[8] = {app_config.modbus_slave_id, 0x04, 0x00, 0x00, 0x00, 0x0A, 0x00, 0x00};
+	uint8_t modbus_req[8] = {app_config.config.modbus_slave_id, 0x04, 0x00, 0x00, 0x00, 0x0A, 0x00, 0x00};
 	uint16_t crc = modbus_crc16(modbus_req, 6);
 	modbus_req[6] = crc & 0xFF;
 	modbus_req[7] = (crc >> 8) & 0xFF;
@@ -213,7 +220,7 @@ void RS485_ReadPZEM(void) {
 	HAL_UART_Transmit(&hlpuart1, (uint8_t *)modbus_req, sizeof(modbus_req), 100);
 
 	if (HAL_UART_Receive(&hlpuart1, buf, sizeof(buf), 500) == HAL_OK) {
-		if (buf[0] == app_config.modbus_slave_id && buf[1] == 0x04 && buf[2] == 0x14) {
+		if (buf[0] == app_config.config.modbus_slave_id && buf[1] == 0x04 && buf[2] == 0x14) {
 			memcpy(pzem_payload, &buf[3], 20);
 			LOG_INFO_APP("PZEM-016 read OK\r\n");
 		} else {
@@ -237,15 +244,57 @@ void RS485_ReadPZEM(void) {
 static void Send_Data(void) {
 	UTIL_LPM_SetStopMode(1U << CFG_LPM_APP, UTIL_LPM_DISABLE);
 	RS485_ReadPZEM();
+	BuildPayload();
 	MeterReadProcessInit();
 	CellularInit();
+}
+
+static uint16_t Packet_Serialize(const Packet_t *pkt, uint8_t *out)
+{
+    uint16_t offset = 0;
+    memcpy(out + offset, &pkt->Header, sizeof(PacketHeader_t));
+    offset += sizeof(PacketHeader_t);
+    memcpy(out + offset, pkt->Data, pkt->Header.Len);
+    offset += pkt->Header.Len;
+    uint16_t crc = modbus_crc16(out, offset);
+    memcpy(out + offset, &crc, sizeof(uint16_t));
+    offset += sizeof(uint16_t);
+    return offset;
+}
+
+void BuildPayload(void) {
+    ADCValue_t adc = ReadVolatges();
+
+    /* Fill data payload buffer — track actual length written */
+    uint16_t plen = 0;
+    tcp_payload_buf[plen++] = adc.u8Vref_V;
+    tcp_payload_buf[plen++] = adc.u8Bkup_V;
+    tcp_payload_buf[plen++] = adc.u8Temp_C;
+    memcpy(&tcp_payload_buf[plen], pzem_payload, 20); plen += 20;
+
+    /* Fill header */
+    memset(&tcp_packet.Header, 0, sizeof(PacketHeader_t));
+    memcpy(tcp_packet.Header.EUI, app_config.config.eui64, 8);
+    tcp_packet.Header.UplinkFCnt   = uplink_fcnt++;
+    tcp_packet.Header.DownlinkFCnt = downlink_fcnt;
+    tcp_packet.Header.ACKReq       = 0;
+    tcp_packet.Header.FPort        = 1;
+    tcp_packet.Header.FCtrl        = 0;
+    tcp_packet.Header.Len          = plen;
+
+    /* Serialize to flat TX buffer */
+    payload.BufferSize = (uint8_t)Packet_Serialize(&tcp_packet, tx_buf);
+
+    LOG_INFO_APP("Payload: %d bytes  FCnt:%lu  Temp:%d C  Vref:%d mV  Bkup:%d mV\r\n",
+                 payload.BufferSize, (unsigned long)tcp_packet.Header.UplinkFCnt,
+                 (int)adc.u16Temp_C, adc.u16Vref_mV, adc.u16Bkup_mV);
 }
 
 void Send_Data_Done(void){
    CellularDeInit();
    UTIL_LPM_SetStopMode(1U << CFG_LPM_APP, UTIL_LPM_ENABLE);
    UTIL_TIMER_StartWithPeriod(&applicationContext.SEND_Data_timer_Id,
-			app_config.send_interval_mins * 60000U);
+			app_config.config.send_interval_mins * 60000U);
 }
 
 
@@ -265,3 +314,117 @@ void MeterReadProcessInit(void) {
 	CMD_Init(CmdProcessNotify);
 
 }
+
+
+
+/* ---- ADC handles (LL constants, nested ADCCTRL_InitConfig_t) ------------ */
+#define ADC_COMMON_INIT_CONF \
+    .ConvParams = { \
+        .TriggerFrequencyMode = LL_ADC_TRIGGER_FREQ_LOW, \
+        .Resolution           = LL_ADC_RESOLUTION_12B, \
+        .DataAlign            = LL_ADC_DATA_ALIGN_RIGHT, \
+        .TriggerStart         = LL_ADC_REG_TRIG_SOFTWARE, \
+        .TriggerEdge          = LL_ADC_REG_TRIG_EXT_RISING, \
+        .ConversionMode       = LL_ADC_REG_CONV_SINGLE, \
+        .DmaTransfer          = LL_ADC_REG_DMA_TRANSFER_NONE, \
+        .Overrun              = LL_ADC_REG_OVR_DATA_OVERWRITTEN, \
+        .SamplingTimeCommon1  = LL_ADC_SAMPLINGTIME_814CYCLES_5, \
+        .SamplingTimeCommon2  = LL_ADC_SAMPLINGTIME_1CYCLE_5 \
+    }, \
+    .SeqParams = { \
+        .Setup    = LL_ADC_REG_SEQ_CONFIGURABLE, \
+        .Length   = LL_ADC_REG_SEQ_SCAN_DISABLE, \
+        .DiscMode = LL_ADC_REG_SEQ_DISCONT_DISABLE \
+    }, \
+    .LowPowerParams = { \
+        .AutoPowerOff  = DISABLE, \
+        .AutonomousDPD = LL_ADC_LP_AUTONOMOUS_DPD_DISABLE \
+    }
+
+ADCCTRL_Handle_t LLVRefIntRequest_Handle = {
+    .Uid = 0x01, .State = ADCCTRL_HANDLE_NOT_REG,
+    .InitConf    = { ADC_COMMON_INIT_CONF },
+    .ChannelConf = { .Channel = LL_ADC_CHANNEL_VREFINT,   .Rank = LL_ADC_REG_RANK_1, .SamplingTime = LL_ADC_SAMPLINGTIME_COMMON_1 }
+};
+
+ADCCTRL_Handle_t LLVCAPRequest_Handle = {
+    .Uid = 0x02, .State = ADCCTRL_HANDLE_NOT_REG,
+    .InitConf    = { ADC_COMMON_INIT_CONF },
+    .ChannelConf = { .Channel = LL_ADC_CHANNEL_3,         .Rank = LL_ADC_REG_RANK_1, .SamplingTime = LL_ADC_SAMPLINGTIME_COMMON_1 }
+};
+
+/* ---- Init ---------------------------------------------------------------- */
+VREFMEAS_Cmd_Status_t VREFMEAS_Init(void) {
+    ADCCTRL_Cmd_Status_t eReturn = ADCCTRL_RegisterHandle(&LLVRefIntRequest_Handle);
+    return ((eReturn == ADCCTRL_OK) || (eReturn == ADCCTRL_HANDLE_ALREADY_REGISTERED))
+           ? VREFMEAS_OK : VREFMEAS_ADC_INIT;
+}
+
+CAPMEAS_Cmd_Status_t CAPMEAS_Init(void) {
+    ADCCTRL_Cmd_Status_t eReturn = ADCCTRL_RegisterHandle(&LLVCAPRequest_Handle);
+    return ((eReturn == ADCCTRL_OK) || (eReturn == ADCCTRL_HANDLE_ALREADY_REGISTERED))
+           ? CAPMEAS_OK : CAPMEAS_ADC_INIT;
+}
+
+/* TEMPMEAS_Init() is provided by temp_measurement.c — call it at boot     */
+
+/* ---- Measurements -------------------------------------------------------- */
+uint16_t VREFMEAS_RequestVrefMeasurement(void) {
+    uint16_t vref_value = 0;
+    UTILS_ENTER_LIMITED_CRITICAL_SECTION(RCC_INTR_PRIO << 4);
+    ADCCTRL_RequestIpState(&LLVRefIntRequest_Handle, ADC_ON);
+    ADCCTRL_RequestRefVoltage(&LLVRefIntRequest_Handle, &vref_value);
+    ADCCTRL_RequestIpState(&LLVRefIntRequest_Handle, ADC_OFF);
+    UTILS_EXIT_LIMITED_CRITICAL_SECTION();
+    return vref_value;
+}
+
+uint16_t CAPMEAS_RequestCapMeasurement(void) {
+    uint16_t cap_value = 0;
+    UTILS_ENTER_LIMITED_CRITICAL_SECTION(RCC_INTR_PRIO << 4);
+    ADCCTRL_RequestIpState(&LLVCAPRequest_Handle, ADC_ON);
+    ADCCTRL_RequestRawValue(&LLVCAPRequest_Handle, &cap_value);
+    ADCCTRL_RequestIpState(&LLVCAPRequest_Handle, ADC_OFF);
+    UTILS_EXIT_LIMITED_CRITICAL_SECTION();
+    return cap_value;
+}
+
+ADCValue_t ReadVolatges(void) {
+    ADCValue_t mV;
+    uint16_t Vref = VREFMEAS_RequestVrefMeasurement();
+    uint16_t Vcap = CAPMEAS_RequestCapMeasurement();
+
+    /* Read temperature using the existing temp_measurement module handle */
+    int16_t temp_raw = 0;
+    UTILS_ENTER_LIMITED_CRITICAL_SECTION(RCC_INTR_PRIO << 4);
+    ADCCTRL_RequestIpState(&LLTempRequest_Handle, ADC_ON);
+    ADCCTRL_RequestTemperature(&LLTempRequest_Handle, &temp_raw);
+    ADCCTRL_RequestIpState(&LLTempRequest_Handle, ADC_OFF);
+    UTILS_EXIT_LIMITED_CRITICAL_SECTION();
+
+    /* Encode: u8Temp_C = temp + 40 (covers -40..+215 °C); u16Temp_C = raw °C */
+    int16_t encoded = temp_raw + TEMPMEAS_MIN_TEMP_LIMIT;
+    if (encoded < 0)   encoded = 0;
+    if (encoded > 255) encoded = 255;
+    uint8_t Temp = (uint8_t)encoded;
+
+    mV.u16Vref_mV = Vref;
+    mV.u8Temp_C   = Temp;
+    mV.u16Temp_C  = temp_raw;
+
+    LOG_INFO_APP("Vref: %d mV\r\n", Vref);
+    LOG_INFO_APP("Vcap raw: %d\r\n", Vcap);
+    LOG_INFO_APP("Temp: %d C (encoded u8=%d)\r\n", (int)temp_raw, Temp);
+
+    if (Vref < 2000) Vref = 2000;
+    mV.u8Vref_V = (uint8_t)((Vref / 10) - 200);
+
+    /* Vcap is a raw 12-bit count; convert to mV using Vref, then encode */
+    uint16_t bkup_mV = (uint16_t)((Vcap / 4095.0f) * Vref);
+    mV.u16Bkup_mV = bkup_mV;
+    if (bkup_mV < 2000) bkup_mV = 2000;
+    mV.u8Bkup_V = (uint8_t)((bkup_mV / 10) - 200);
+
+    return mV;
+}
+/* ------------------------------------------------------------------------- */

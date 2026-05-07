@@ -1,13 +1,13 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    p2p_server_app.h
+  * @file    Datalogger.h
   * @author  MCD Application Team
-  * @brief   Header for p2p_server_app.c
+  * @brief   Header for Datalogger.c
   ******************************************************************************
   * @attention
   *
-  * Copyright (c) 2022 STMicroelectronics.
+  * Copyright (c) 2026 STMicroelectronics.
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
@@ -19,8 +19,8 @@
 /* USER CODE END Header */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef P2P_SERVER_APP_H
-#define P2P_SERVER_APP_H
+#ifndef DATALOGGER_H
+#define DATALOGGER_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,32 +29,61 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #include "ble_types.h"
 #include "ble_core.h"
+#include "svc_ctl.h"
 /* USER CODE BEGIN Includes */
 
 /* USER CODE END Includes */
 
+/* Exported defines ----------------------------------------------------------*/
+/* USER CODE BEGIN ED */
+
+/* USER CODE END ED */
+
 /* Exported types ------------------------------------------------------------*/
 typedef enum
 {
-  P2P_SERVER_CONN_HANDLE_EVT,
-  P2P_SERVER_DISCON_HANDLE_EVT,
+  DATALOGGER_CFG_WRT,
+  DATALOGGER_CFG_NTFY,
+  /* USER CODE BEGIN Service1_CharOpcode_t */
 
-  /* USER CODE BEGIN Service1_OpcodeNotificationEvt_t */
+  /* USER CODE END Service1_CharOpcode_t */
+  DATALOGGER_CHAROPCODE_LAST
+} DATALOGGER_CharOpcode_t;
 
-  /* USER CODE END Service1_OpcodeNotificationEvt_t */
+typedef enum
+{
+  DATALOGGER_CFG_WRT_READ_EVT,
+  DATALOGGER_CFG_WRT_WRITE_NO_RESP_EVT,
+  DATALOGGER_CFG_NTFY_NOTIFY_ENABLED_EVT,
+  DATALOGGER_CFG_NTFY_NOTIFY_DISABLED_EVT,
+  /* USER CODE BEGIN Service1_OpcodeEvt_t */
 
-  P2P_SERVER_LAST_EVT,
-} P2P_SERVER_APP_OpcodeNotificationEvt_t;
+  /* USER CODE END Service1_OpcodeEvt_t */
+  DATALOGGER_BOOT_REQUEST_EVT
+} DATALOGGER_OpcodeEvt_t;
 
 typedef struct
 {
-  P2P_SERVER_APP_OpcodeNotificationEvt_t          EvtOpcode;
-  uint16_t                                 ConnectionHandle;
+  uint8_t *p_Payload;
+  uint8_t Length;
 
-  /* USER CODE BEGIN P2P_SERVER_APP_ConnHandleNotEvt_t */
+  /* USER CODE BEGIN Service1_Data_t */
 
-  /* USER CODE END P2P_SERVER_APP_ConnHandleNotEvt_t */
-} P2P_SERVER_APP_ConnHandleNotEvt_t;
+  /* USER CODE END Service1_Data_t */
+} DATALOGGER_Data_t;
+
+typedef struct
+{
+  DATALOGGER_OpcodeEvt_t       EvtOpcode;
+  DATALOGGER_Data_t             DataTransfered;
+  uint16_t                ConnectionHandle;
+  uint16_t                AttributeHandle;
+  uint8_t                 ServiceInstance;
+  /* USER CODE BEGIN Service1_NotificationEvt_t */
+
+  /* USER CODE END Service1_NotificationEvt_t */
+} DATALOGGER_NotificationEvt_t;
+
 /* USER CODE BEGIN ET */
 
 /* USER CODE END ET */
@@ -75,8 +104,9 @@ typedef struct
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
-void P2P_SERVER_APP_Init(void);
-void P2P_SERVER_APP_EvtRx(P2P_SERVER_APP_ConnHandleNotEvt_t *p_Notification);
+void DATALOGGER_Init(void);
+void DATALOGGER_Notification(DATALOGGER_NotificationEvt_t *p_Notification);
+tBleStatus DATALOGGER_UpdateValue(DATALOGGER_CharOpcode_t CharOpcode, DATALOGGER_Data_t *pData);
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */
@@ -85,4 +115,4 @@ void P2P_SERVER_APP_EvtRx(P2P_SERVER_APP_ConnHandleNotEvt_t *p_Notification);
 }
 #endif
 
-#endif /*P2P_SERVER_APP_H */
+#endif /*DATALOGGER_H */

@@ -1,13 +1,13 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    p2p_server_app.c
+  * @file    Datalogger_app.c
   * @author  MCD Application Team
-  * @brief   p2p_server_app application definition.
+  * @brief   Datalogger_app application definition.
   ******************************************************************************
   * @attention
   *
-  * Copyright (c) 2022 STMicroelectronics.
+  * Copyright (c) 2026 STMicroelectronics.
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
@@ -25,52 +25,41 @@
 #include "app_ble.h"
 #include "ll_sys_if.h"
 #include "dbg_trace.h"
-#include "p2p_server_app.h"
-#include "p2p_server.h"
+#include "datalogger_app.h"
+#include "datalogger.h"
 #include "stm32_rtos.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "app_bsp.h"
 #include "application.h"
+#include "stm32_timer.h"
 #include <string.h>
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
- typedef struct{
-    uint8_t             Device_Led_Selection;
-    uint8_t             Led1;
- }P2P_LedCharValue_t;
-
- typedef struct{
-    uint8_t             Device_Button_Selection;
-    uint8_t             ButtonStatus;
- }P2P_ButtonCharValue_t;
 
 /* USER CODE END PTD */
 
 typedef enum
 {
-  Switch_c_NOTIFICATION_OFF,
-  Switch_c_NOTIFICATION_ON,
+  Cfg_ntfy_NOTIFICATION_OFF,
+  Cfg_ntfy_NOTIFICATION_ON,
   /* USER CODE BEGIN Service1_APP_SendInformation_t */
 
   /* USER CODE END Service1_APP_SendInformation_t */
-  P2P_SERVER_APP_SENDINFORMATION_LAST
-} P2P_SERVER_APP_SendInformation_t;
+  DATALOGGER_APP_SENDINFORMATION_LAST
+} DATALOGGER_APP_SendInformation_t;
 
 typedef struct
 {
-  P2P_SERVER_APP_SendInformation_t     Switch_c_Notification_Status;
+  DATALOGGER_APP_SendInformation_t     Cfg_ntfy_Notification_Status;
   /* USER CODE BEGIN Service1_APP_Context_t */
-  P2P_LedCharValue_t              LedControl;
-  P2P_ButtonCharValue_t           ButtonControl;
 
   /* USER CODE END Service1_APP_Context_t */
   uint16_t              ConnectionHandle;
-} P2P_SERVER_APP_Context_t;
+} DATALOGGER_APP_Context_t;
 
 /* Private defines -----------------------------------------------------------*/
 /* USER CODE BEGIN PD */
@@ -88,24 +77,24 @@ typedef struct
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-static P2P_SERVER_APP_Context_t P2P_SERVER_APP_Context;
+static DATALOGGER_APP_Context_t DATALOGGER_APP_Context;
 
-uint8_t a_P2P_SERVER_UpdateCharData[247];
+uint8_t a_DATALOGGER_UpdateCharData[247];
 
 /* USER CODE BEGIN PV */
-
+static UTIL_TIMER_Object_t notif_delay_timer;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
-static void P2P_SERVER_Switch_c_SendNotification(void);
+static void DATALOGGER_Cfg_ntfy_SendNotification(void);
+static void DATALOGGER_NotifDelay_TimerCb(void *arg);
 
 /* USER CODE BEGIN PFP */
-static void P2P_SERVER_APP_LED_BUTTON_context_Init(void);
 
 /* USER CODE END PFP */
 
 /* Functions Definition ------------------------------------------------------*/
-void P2P_SERVER_Notification(P2P_SERVER_NotificationEvt_t *p_Notification)
+void DATALOGGER_Notification(DATALOGGER_NotificationEvt_t *p_Notification)
 {
   /* USER CODE BEGIN Service1_Notification_1 */
 
@@ -116,49 +105,57 @@ void P2P_SERVER_Notification(P2P_SERVER_NotificationEvt_t *p_Notification)
 
     /* USER CODE END Service1_Notification_Service1_EvtOpcode */
 
-    case P2P_SERVER_LED_C_READ_EVT:
+    case DATALOGGER_CFG_WRT_READ_EVT:
       /* USER CODE BEGIN Service1Char1_READ_EVT */
 
       /* USER CODE END Service1Char1_READ_EVT */
       break;
 
-    case P2P_SERVER_LED_C_WRITE_NO_RESP_EVT:
+    case DATALOGGER_CFG_WRT_WRITE_NO_RESP_EVT:
       /* USER CODE BEGIN Service1Char1_WRITE_NO_RESP_EVT */
-      if(p_Notification->DataTransfered.Length == sizeof(AppConfig_t))
+      if(p_Notification->DataTransfered.Length >= sizeof(uint16_t))
       {
-        const AppConfig_t *incoming = (const AppConfig_t *)p_Notification->DataTransfered.p_Payload;
-        if(incoming->magic == APP_CONFIG_MAGIC)
+        uint16_t frame_head;
+        memcpy(&frame_head, p_Notification->DataTransfered.p_Payload, sizeof(uint16_t));
+        switch(frame_head)
         {
-          memcpy(&app_config, incoming, sizeof(AppConfig_t));
-          AppConfig_Save();
-          LOG_INFO_APP("-- P2P : AppConfig received and saved\n");
+          case USER_CONFIG_FRAME_HEAD:
+            if(p_Notification->DataTransfered.Length == sizeof(UserConfig_t))
+            {
+              memcpy(&app_config.config, p_Notification->DataTransfered.p_Payload, sizeof(UserConfig_t));
+              AppConfig_FillHwIds();
+              AppConfig_Save();
+              LOG_INFO_APP("-- DATALOGGER : UserConfig received and saved\n");
+              UTIL_TIMER_StartWithPeriod(&notif_delay_timer, 1000U);
+            }
+            else
+            {
+              LOG_INFO_APP("-- DATALOGGER : UserConfig wrong length %d (expected %d)\n",
+                           p_Notification->DataTransfered.Length, sizeof(UserConfig_t));
+            }
+            break;
+
+          default:
+            LOG_INFO_APP("-- DATALOGGER : Unknown frame_head 0x%04X, ignored\n", frame_head);
+            break;
         }
-        else
-        {
-          LOG_INFO_APP("-- P2P : AppConfig bad magic, ignored\n");
-        }
-      }
-      else
-      {
-        LOG_INFO_APP("-- P2P : AppConfig wrong length %d (expected %d)\n",
-                     p_Notification->DataTransfered.Length, sizeof(AppConfig_t));
       }
       /* USER CODE END Service1Char1_WRITE_NO_RESP_EVT */
       break;
 
-    case P2P_SERVER_SWITCH_C_NOTIFY_ENABLED_EVT:
+    case DATALOGGER_CFG_NTFY_NOTIFY_ENABLED_EVT:
       /* USER CODE BEGIN Service1Char2_NOTIFY_ENABLED_EVT */
-      P2P_SERVER_APP_Context.Switch_c_Notification_Status = Switch_c_NOTIFICATION_ON;
-      LOG_INFO_APP("-- P2P APPLICATION SERVER : NOTIFICATION ENABLED\n");
-      LOG_INFO_APP(" \n\r");
+      DATALOGGER_APP_Context.Cfg_ntfy_Notification_Status = Cfg_ntfy_NOTIFICATION_ON;
+      LOG_INFO_APP("-- DATALOGGER : NOTIFICATION ENABLED\n");
+     // UTIL_SEQ_SetTask(1U << CFG_TASK_SEND_NOTIF_ID, CFG_SEQ_PRIO_0);
+     UTIL_TIMER_StartWithPeriod(&notif_delay_timer, 1000U);
       /* USER CODE END Service1Char2_NOTIFY_ENABLED_EVT */
       break;
 
-    case P2P_SERVER_SWITCH_C_NOTIFY_DISABLED_EVT:
+    case DATALOGGER_CFG_NTFY_NOTIFY_DISABLED_EVT:
       /* USER CODE BEGIN Service1Char2_NOTIFY_DISABLED_EVT */
-      P2P_SERVER_APP_Context.Switch_c_Notification_Status = Switch_c_NOTIFICATION_OFF;
-      LOG_INFO_APP("-- P2P APPLICATION SERVER : NOTIFICATION DISABLED\n");
-      LOG_INFO_APP(" \n\r");
+      DATALOGGER_APP_Context.Cfg_ntfy_Notification_Status = Cfg_ntfy_NOTIFICATION_OFF;
+      LOG_INFO_APP("-- DATALOGGER : NOTIFICATION DISABLED\n");
       /* USER CODE END Service1Char2_NOTIFY_DISABLED_EVT */
       break;
 
@@ -174,7 +171,7 @@ void P2P_SERVER_Notification(P2P_SERVER_NotificationEvt_t *p_Notification)
   return;
 }
 
-void P2P_SERVER_APP_EvtRx(P2P_SERVER_APP_ConnHandleNotEvt_t *p_Notification)
+void DATALOGGER_APP_EvtRx(DATALOGGER_APP_ConnHandleNotEvt_t *p_Notification)
 {
   /* USER CODE BEGIN Service1_APP_EvtRx_1 */
 
@@ -185,15 +182,17 @@ void P2P_SERVER_APP_EvtRx(P2P_SERVER_APP_ConnHandleNotEvt_t *p_Notification)
     /* USER CODE BEGIN Service1_APP_EvtRx_Service1_EvtOpcode */
 
     /* USER CODE END Service1_APP_EvtRx_Service1_EvtOpcode */
-    case P2P_SERVER_CONN_HANDLE_EVT :
+    case DATALOGGER_CONN_HANDLE_EVT :
       /* USER CODE BEGIN Service1_APP_CONN_HANDLE_EVT */
-
+      DATALOGGER_APP_Context.ConnectionHandle = p_Notification->ConnectionHandle;
+      // UTIL_SEQ_SetTask(1U << CFG_TASK_SEND_NOTIF_ID, CFG_SEQ_PRIO_0);
+      UTIL_TIMER_StartWithPeriod(&notif_delay_timer, 1000U);
       /* USER CODE END Service1_APP_CONN_HANDLE_EVT */
       break;
 
-    case P2P_SERVER_DISCON_HANDLE_EVT :
+    case DATALOGGER_DISCON_HANDLE_EVT :
       /* USER CODE BEGIN Service1_APP_DISCON_HANDLE_EVT */
-      P2P_SERVER_APP_LED_BUTTON_context_Init();
+
       /* USER CODE END Service1_APP_DISCON_HANDLE_EVT */
       break;
 
@@ -211,19 +210,16 @@ void P2P_SERVER_APP_EvtRx(P2P_SERVER_APP_ConnHandleNotEvt_t *p_Notification)
   return;
 }
 
-void P2P_SERVER_APP_Init(void)
+void DATALOGGER_APP_Init(void)
 {
-  UNUSED(P2P_SERVER_APP_Context);
-  P2P_SERVER_Init();
+  UNUSED(DATALOGGER_APP_Context);
+  DATALOGGER_Init();
 
   /* USER CODE BEGIN Service1_APP_Init */
-  UTIL_SEQ_RegTask( 1U << CFG_TASK_SEND_NOTIF_ID, UTIL_SEQ_RFU, P2P_SERVER_Switch_c_SendNotification);
-
-  /**
-   * Initialize LedButton Service
-   */
-  P2P_SERVER_APP_Context.Switch_c_Notification_Status= Switch_c_NOTIFICATION_OFF;
-  P2P_SERVER_APP_LED_BUTTON_context_Init();
+  UTIL_SEQ_RegTask(1U << CFG_TASK_SEND_NOTIF_ID, UTIL_SEQ_RFU,
+                   DATALOGGER_Cfg_ntfy_SendNotification);
+  UTIL_TIMER_Create(&notif_delay_timer, 0, UTIL_TIMER_ONESHOT,
+                    DATALOGGER_NotifDelay_TimerCb, NULL);
   /* USER CODE END Service1_APP_Init */
   return;
 }
@@ -237,64 +233,40 @@ void P2P_SERVER_APP_Init(void)
  * LOCAL FUNCTIONS
  *
  *************************************************************/
-__USED void P2P_SERVER_Switch_c_SendNotification(void) /* Property Notification */
+__USED void DATALOGGER_Cfg_ntfy_SendNotification(void) /* Property Notification */
 {
-  P2P_SERVER_APP_SendInformation_t notification_on_off = Switch_c_NOTIFICATION_OFF;
-  P2P_SERVER_Data_t p2p_server_notification_data;
+  DATALOGGER_APP_SendInformation_t notification_on_off = Cfg_ntfy_NOTIFICATION_OFF;
+  DATALOGGER_Data_t datalogger_notification_data;
 
-  p2p_server_notification_data.p_Payload = (uint8_t*)a_P2P_SERVER_UpdateCharData;
-  p2p_server_notification_data.Length = 0;
+  datalogger_notification_data.p_Payload = (uint8_t*)a_DATALOGGER_UpdateCharData;
+  datalogger_notification_data.Length = 0;
 
   /* USER CODE BEGIN Service1Char2_NS_1 */
-
-  if(P2P_SERVER_APP_Context.ButtonControl.ButtonStatus == 0x00)
-  {
-    P2P_SERVER_APP_Context.ButtonControl.ButtonStatus = 0x01;
-  }
-  else
-  {
-    P2P_SERVER_APP_Context.ButtonControl.ButtonStatus = 0x00;
-  }
-  a_P2P_SERVER_UpdateCharData[0] = 0x01; /* Device Led selection */
-  a_P2P_SERVER_UpdateCharData[1] = P2P_SERVER_APP_Context.ButtonControl.ButtonStatus;
-  /* Update notification data length */
-  p2p_server_notification_data.Length = (p2p_server_notification_data.Length) + 2;
-
-  if(P2P_SERVER_APP_Context.Switch_c_Notification_Status == Switch_c_NOTIFICATION_ON)
-  {
-    LOG_INFO_APP("-- P2P APPLICATION SERVER : INFORM CLIENT BUTTON 1 PUSHED\n");
-    notification_on_off = Switch_c_NOTIFICATION_ON;
-  }
-  else
-  {
-    LOG_INFO_APP("-- P2P APPLICATION SERVER : CAN'T INFORM CLIENT - NOTIFICATION DISABLED\n");
-  }
+  notification_on_off = DATALOGGER_APP_Context.Cfg_ntfy_Notification_Status;
   /* USER CODE END Service1Char2_NS_1 */
 
-  if (notification_on_off != Switch_c_NOTIFICATION_OFF)
+  if (notification_on_off != Cfg_ntfy_NOTIFICATION_OFF)
   {
-    P2P_SERVER_UpdateValue(P2P_SERVER_SWITCH_C, &p2p_server_notification_data);
+    DATALOGGER_UpdateValue(DATALOGGER_CFG_NTFY, &datalogger_notification_data);
   }
 
   /* USER CODE BEGIN Service1Char2_NS_Last */
-
+  if (notification_on_off != Cfg_ntfy_NOTIFICATION_OFF)
+  {
+    memcpy(a_DATALOGGER_UpdateCharData, &app_config.config, sizeof(UserConfig_t));
+    datalogger_notification_data.Length = sizeof(UserConfig_t);
+    DATALOGGER_UpdateValue(DATALOGGER_CFG_NTFY, &datalogger_notification_data);
+    LOG_INFO_APP("-- DATALOGGER : UserConfig notified (%d bytes)\n", sizeof(UserConfig_t));
+  }
   /* USER CODE END Service1Char2_NS_Last */
 
   return;
 }
 
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS */
-static void P2P_SERVER_APP_LED_BUTTON_context_Init(void)
+static void DATALOGGER_NotifDelay_TimerCb(void *arg)
 {
-  #if (CFG_LED_SUPPORTED == 1)
-  BSP_LED_Off(LED_BLUE);
-  #endif
-  P2P_SERVER_APP_Context.LedControl.Device_Led_Selection=0x01;        /* select device 01 */
-  P2P_SERVER_APP_Context.LedControl.Led1=0x00;                        /* led OFF */
-  P2P_SERVER_APP_Context.ButtonControl.Device_Button_Selection=0x01;  /* select device 01 */
-  P2P_SERVER_APP_Context.ButtonControl.ButtonStatus=0x00;
-
-  return;
+  UNUSED(arg);
+  UTIL_SEQ_SetTask(1U << CFG_TASK_SEND_NOTIF_ID, CFG_SEQ_PRIO_0);
 }
-
 /* USER CODE END FD_LOCAL_FUNCTIONS */

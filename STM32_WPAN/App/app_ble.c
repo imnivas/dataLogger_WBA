@@ -35,8 +35,8 @@
 #include "advanced_memory_manager.h"
 #include "blestack.h"
 #include "simple_nvm_arbiter.h"
-#include "p2p_server.h"
-#include "p2p_server_app.h"
+#include "datalogger.h"
+#include "datalogger_app.h"
 #include "ota.h"
 #include "ota_app.h"
 /* Private includes ----------------------------------------------------------*/
@@ -178,7 +178,7 @@ static uint8_t a_BLE_CfgIrValue[16];
 /* Encryption root key used to derive LTK(Legacy) and CSRK */
 static uint8_t a_BLE_CfgErValue[16];
 static BleApplicationContext_t bleAppContext;
-P2P_SERVER_APP_ConnHandleNotEvt_t P2P_SERVERHandleNotification;
+DATALOGGER_APP_ConnHandleNotEvt_t DATALOGGERHandleNotification;
 OTA_APP_ConnHandleNotEvt_t OTAHandleNotification;
 
 static char a_GapDeviceName[] = {  'D', 'L', 'X', 'X', 'X', 'X', 'X', 'X' }; /* Gap Device Name */
@@ -305,7 +305,7 @@ void APP_BLE_Init(void)
     /* Initialize Services and Characteristics. */
     LOG_INFO_APP("\n");
     LOG_INFO_APP("Services and Characteristics creation\n");
-    P2P_SERVER_APP_Init();
+    DATALOGGER_APP_Init();
     OTA_APP_Init();
     LOG_INFO_APP("End of Services and Characteristics creation\n");
     LOG_INFO_APP("\n");
@@ -374,11 +374,11 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
       /* USER CODE BEGIN EVT_DISCONN_COMPLETE_1 */
 
       /* USER CODE END EVT_DISCONN_COMPLETE_1 */
-      P2P_SERVERHandleNotification.EvtOpcode = P2P_SERVER_DISCON_HANDLE_EVT;
+      DATALOGGERHandleNotification.EvtOpcode = DATALOGGER_DISCON_HANDLE_EVT;
       OTAHandleNotification.EvtOpcode = OTA_DISCON_HANDLE_EVT;
-      P2P_SERVERHandleNotification.ConnectionHandle = p_disconnection_complete_event->Connection_Handle;
+      DATALOGGERHandleNotification.ConnectionHandle = p_disconnection_complete_event->Connection_Handle;
       OTAHandleNotification.ConnectionHandle = p_disconnection_complete_event->Connection_Handle;
-      P2P_SERVER_APP_EvtRx(&P2P_SERVERHandleNotification);
+      DATALOGGER_APP_EvtRx(&DATALOGGERHandleNotification);
       OTA_APP_EvtRx(&OTAHandleNotification);
       /* USER CODE BEGIN EVT_DISCONN_COMPLETE */
       APP_BLE_Procedure_Gap_Peripheral(PROC_GAP_PERIPH_ADVERTISE_START_FAST);
@@ -476,11 +476,11 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
           }
           bleAppContext.connectionHandle = p_enhanced_conn_complete->Connection_Handle;
 
-          P2P_SERVERHandleNotification.EvtOpcode = P2P_SERVER_CONN_HANDLE_EVT;
+          DATALOGGERHandleNotification.EvtOpcode = DATALOGGER_CONN_HANDLE_EVT;
           OTAHandleNotification.EvtOpcode = OTA_CONN_HANDLE_EVT;
-          P2P_SERVERHandleNotification.ConnectionHandle = p_enhanced_conn_complete->Connection_Handle;
+          DATALOGGERHandleNotification.ConnectionHandle = p_enhanced_conn_complete->Connection_Handle;
           OTAHandleNotification.ConnectionHandle = p_enhanced_conn_complete->Connection_Handle;
-          P2P_SERVER_APP_EvtRx(&P2P_SERVERHandleNotification);
+          DATALOGGER_APP_EvtRx(&DATALOGGERHandleNotification);
           OTA_APP_EvtRx(&OTAHandleNotification);
           /* USER CODE BEGIN HCI_EVT_LE_ENHANCED_CONN_COMPLETE */
           /* The connection is done, there is no need anymore to schedule the LP ADV */
@@ -523,11 +523,11 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
           }
           bleAppContext.connectionHandle = p_conn_complete->Connection_Handle;
 
-          P2P_SERVERHandleNotification.EvtOpcode = P2P_SERVER_CONN_HANDLE_EVT;
+          DATALOGGERHandleNotification.EvtOpcode = DATALOGGER_CONN_HANDLE_EVT;
           OTAHandleNotification.EvtOpcode = OTA_CONN_HANDLE_EVT;
-          P2P_SERVERHandleNotification.ConnectionHandle = p_conn_complete->Connection_Handle;
+          DATALOGGERHandleNotification.ConnectionHandle = p_conn_complete->Connection_Handle;
           OTAHandleNotification.ConnectionHandle = p_conn_complete->Connection_Handle;
-          P2P_SERVER_APP_EvtRx(&P2P_SERVERHandleNotification);
+          DATALOGGER_APP_EvtRx(&DATALOGGERHandleNotification);
           OTA_APP_EvtRx(&OTAHandleNotification);
           /* USER CODE BEGIN HCI_EVT_LE_CONN_COMPLETE */
           /* The connection is done, there is no need anymore to schedule the LP ADV */
@@ -1602,14 +1602,15 @@ static const uint8_t* BleGenerateBdAddress(void)
     /**
      * Public Address with the ST company ID
      * bit[47:24] : 24bits (OUI) equal to the company ID
-     * bit[23:16] : UDN[23:16].
+     * bit[23:16] : Device ID.
      * bit[15:0] : The last 16bits from the UDN
      * Note: In order to use the Public Address in a final product, a dedicated
      * 24bits company ID (OUI) shall be bought.
      */
       a_BdAddr[0] = (uint8_t)(udn & 0x000000FF);
       a_BdAddr[1] = (uint8_t)((udn & 0x0000FF00) >> 8);
-      a_BdAddr[2] = (uint8_t)((udn >> 16) & 0xFF);
+      //a_BdAddr[2] = (uint8_t)device_id;
+       a_BdAddr[2] = (uint8_t)((udn >> 16) & 0xFF);
       a_BdAddr[3] = (uint8_t)(company_id & 0x000000FF);
       a_BdAddr[4] = (uint8_t)((company_id & 0x0000FF00) >> 8);
       a_BdAddr[5] = (uint8_t)((company_id & 0x00FF0000) >> 16);

@@ -465,6 +465,16 @@
 			<locationURI>PARENT-1-PROJECT_LOC/STM32_WPAN/App/app_bsp.c</locationURI>
 		</link>
 		<link>
+			<name>Application/User/STM32_WPAN/App/datalogger.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/STM32_WPAN/App/datalogger.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/STM32_WPAN/App/datalogger_app.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/STM32_WPAN/App/datalogger_app.c</locationURI>
+		</link>
+		<link>
 			<name>Application/User/STM32_WPAN/App/ota.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/STM32_WPAN/App/ota.c</locationURI>
@@ -473,16 +483,6 @@
 			<name>Application/User/STM32_WPAN/App/ota_app.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/STM32_WPAN/App/ota_app.c</locationURI>
-		</link>
-		<link>
-			<name>Application/User/STM32_WPAN/App/p2p_server.c</name>
-			<type>1</type>
-			<locationURI>PARENT-1-PROJECT_LOC/STM32_WPAN/App/p2p_server.c</locationURI>
-		</link>
-		<link>
-			<name>Application/User/STM32_WPAN/App/p2p_server_app.c</name>
-			<type>1</type>
-			<locationURI>PARENT-1-PROJECT_LOC/STM32_WPAN/App/p2p_server_app.c</locationURI>
 		</link>
 		<link>
 			<name>Application/User/STM32_WPAN/Target/bleplat.c</name>

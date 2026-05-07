@@ -1,13 +1,13 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    p2p_server.c
+  * @file    Datalogger.c
   * @author  MCD Application Team
-  * @brief   p2p_server definition.
+  * @brief   Datalogger definition.
   ******************************************************************************
   * @attention
   *
-  * Copyright (c) 2022 STMicroelectronics.
+  * Copyright (c) 2026 STMicroelectronics.
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
@@ -20,7 +20,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "log_module.h"
-#include "p2p_server.h"
+#include "datalogger.h"
 
 /* USER CODE BEGIN Includes */
 
@@ -33,14 +33,14 @@
 /* USER CODE END PTD */
 
 typedef struct{
-  uint16_t  P2p_serverSvcHdle;                  /**< P2p_server Service Handle */
-  uint16_t  Led_CCharHdle;                  /**< LED_C Characteristic Handle */
-  uint16_t  Switch_CCharHdle;                  /**< SWITCH_C Characteristic Handle */
+  uint16_t  DataloggerSvcHdle;                  /**< Datalogger Service Handle */
+  uint16_t  Cfg_WrtCharHdle;                  /**< CFG_WRT Characteristic Handle */
+  uint16_t  Cfg_NtfyCharHdle;                  /**< CFG_NTFY Characteristic Handle */
 /* USER CODE BEGIN Context */
   /* Place holder for Characteristic Descriptors Handle*/
 
 /* USER CODE END Context */
-}P2P_SERVER_Context_t;
+}DATALOGGER_Context_t;
 
 /* Private defines -----------------------------------------------------------*/
 #define UUID_128_SUPPORTED  1
@@ -70,17 +70,17 @@ typedef struct{
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-static const uint16_t SizeLed_C = 2;
-static const uint16_t SizeSwitch_C = 2;
+static const uint16_t SizeCfg_Wrt = 240;
+static const uint16_t SizeCfg_Ntfy = 240;
 
-static P2P_SERVER_Context_t P2P_SERVER_Context;
+static DATALOGGER_Context_t DATALOGGER_Context;
 
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
-static SVCCTL_EvtAckStatus_t P2P_SERVER_EventHandler(void *p_pckt);
+static SVCCTL_EvtAckStatus_t DATALOGGER_EventHandler(void *p_pckt);
 
 /* USER CODE BEGIN PFP */
 
@@ -108,9 +108,9 @@ do {\
  0000FE418E2245419D4C21EDAE82ED19: Characteristic 128bits UUID
  0000FE428E2245419D4C21EDAE82ED19: Characteristic 128bits UUID
  */
-#define COPY_P2P_SERVER_UUID(uuid_struct)       COPY_UUID_128(uuid_struct,0x00,0x00,0xfe,0x40,0xcc,0x7a,0x48,0x2a,0x98,0x4a,0x7f,0x2e,0xd5,0xb3,0xe5,0x8f)
-#define COPY_LED_C_UUID(uuid_struct)       COPY_UUID_128(uuid_struct,0x00,0x00,0xfe,0x41,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
-#define COPY_SWITCH_C_UUID(uuid_struct)       COPY_UUID_128(uuid_struct,0x00,0x00,0xfe,0x42,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
+#define COPY_DATALOGGER_UUID(uuid_struct)       COPY_UUID_128(uuid_struct,0x00,0x00,0xfe,0x40,0xcc,0x7a,0x48,0x2a,0x98,0x4a,0x7f,0x2e,0xd5,0xb3,0xe5,0x8f)
+#define COPY_CFG_WRT_UUID(uuid_struct)       COPY_UUID_128(uuid_struct,0x00,0x00,0xfe,0x41,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
+#define COPY_CFG_NTFY_UUID(uuid_struct)       COPY_UUID_128(uuid_struct,0x00,0x00,0xfe,0x42,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
 
 /* USER CODE BEGIN PF */
 
@@ -121,13 +121,13 @@ do {\
  * @param  p_Event: Address of the buffer holding the p_Event
  * @retval Ack: Return whether the p_Event has been managed or not
  */
-static SVCCTL_EvtAckStatus_t P2P_SERVER_EventHandler(void *p_Event)
+static SVCCTL_EvtAckStatus_t DATALOGGER_EventHandler(void *p_Event)
 {
   SVCCTL_EvtAckStatus_t return_value;
   hci_event_pckt *p_event_pckt;
   evt_blecore_aci *p_blecore_evt;
   aci_gatt_attribute_modified_event_rp0 *p_attribute_modified;
-  P2P_SERVER_NotificationEvt_t                 notification;
+  DATALOGGER_NotificationEvt_t                 notification;
   /* USER CODE BEGIN Service1_EventHandler_1 */
 
   /* USER CODE END Service1_EventHandler_1 */
@@ -151,7 +151,7 @@ static SVCCTL_EvtAckStatus_t P2P_SERVER_EventHandler(void *p_Event)
           notification.AttributeHandle          = p_attribute_modified->Attr_Handle;
           notification.DataTransfered.Length    = p_attribute_modified->Attr_Data_Length;
           notification.DataTransfered.p_Payload = p_attribute_modified->Attr_Data;
-          if(p_attribute_modified->Attr_Handle == (P2P_SERVER_Context.Switch_CCharHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))
+          if(p_attribute_modified->Attr_Handle == (DATALOGGER_Context.Cfg_NtfyCharHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))
           {
             return_value = SVCCTL_EvtAckFlowEnable;
             /* USER CODE BEGIN Service1_Char_2 */
@@ -168,8 +168,8 @@ static SVCCTL_EvtAckStatus_t P2P_SERVER_EventHandler(void *p_Event)
                 /* USER CODE BEGIN Service1_Char_2_Disabled_BEGIN */
 
                 /* USER CODE END Service1_Char_2_Disabled_BEGIN */
-                notification.EvtOpcode = P2P_SERVER_SWITCH_C_NOTIFY_DISABLED_EVT;
-                P2P_SERVER_Notification(&notification);
+                notification.EvtOpcode = DATALOGGER_CFG_NTFY_NOTIFY_DISABLED_EVT;
+                DATALOGGER_Notification(&notification);
                 /* USER CODE BEGIN Service1_Char_2_Disabled_END */
 
                 /* USER CODE END Service1_Char_2_Disabled_END */
@@ -180,8 +180,8 @@ static SVCCTL_EvtAckStatus_t P2P_SERVER_EventHandler(void *p_Event)
                 /* USER CODE BEGIN Service1_Char_2_COMSVC_Notification_BEGIN */
 
                 /* USER CODE END Service1_Char_2_COMSVC_Notification_BEGIN */
-                notification.EvtOpcode = P2P_SERVER_SWITCH_C_NOTIFY_ENABLED_EVT;
-                P2P_SERVER_Notification(&notification);
+                notification.EvtOpcode = DATALOGGER_CFG_NTFY_NOTIFY_ENABLED_EVT;
+                DATALOGGER_Notification(&notification);
                 /* USER CODE BEGIN Service1_Char_2_COMSVC_Notification_END */
 
                 /* USER CODE END Service1_Char_2_COMSVC_Notification_END */
@@ -195,17 +195,17 @@ static SVCCTL_EvtAckStatus_t P2P_SERVER_EventHandler(void *p_Event)
             }
           }
 
-          else if(p_attribute_modified->Attr_Handle == (P2P_SERVER_Context.Led_CCharHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
+          else if(p_attribute_modified->Attr_Handle == (DATALOGGER_Context.Cfg_WrtCharHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
           {
             return_value = SVCCTL_EvtAckFlowEnable;
 
-            notification.EvtOpcode = P2P_SERVER_LED_C_WRITE_NO_RESP_EVT;
+            notification.EvtOpcode = DATALOGGER_CFG_WRT_WRITE_NO_RESP_EVT;
             /* USER CODE BEGIN Service1_Char_1_ACI_GATT_ATTRIBUTE_MODIFIED_VSEVT_CODE */
-            LOG_INFO_APP("-- GATT : LED CONFIGURATION RECEIVED\n");
+            LOG_INFO_APP("-- GATT :  CONFIGURATION RECEIVED\n");
             notification.DataTransfered.Length = p_attribute_modified->Attr_Data_Length;
             notification.DataTransfered.p_Payload = p_attribute_modified->Attr_Data;
             /* USER CODE END Service1_Char_1_ACI_GATT_ATTRIBUTE_MODIFIED_VSEVT_CODE */
-            P2P_SERVER_Notification(&notification);
+            DATALOGGER_Notification(&notification);
           }
 
           /* USER CODE BEGIN EVT_BLUE_GATT_ATTRIBUTE_MODIFIED_END */
@@ -258,21 +258,6 @@ static SVCCTL_EvtAckStatus_t P2P_SERVER_EventHandler(void *p_Event)
           break;/* ACI_ATT_EXCHANGE_MTU_RESP_VSEVT_CODE */
         }
         /* USER CODE BEGIN BLECORE_EVT */
-        /* Manage ACI_GATT_INDICATION_VSEVT_CODE occurring on Android 12 */
-        case ACI_GATT_INDICATION_VSEVT_CODE:
-          {
-            aci_gatt_indication_event_rp0 *pr = (void*)p_blecore_evt->data;
-            tBleStatus status = aci_gatt_confirm_indication(pr->Connection_Handle);
-            if (status != BLE_STATUS_SUCCESS)
-            {
-              LOG_INFO_APP("  Fail   : aci_gatt_confirm_indication command, result: 0x%x \n", status);
-            }
-            else
-            {
-              LOG_INFO_APP("  Success: aci_gatt_confirm_indication command\n");
-            }
-          }
-          break; /* end ACI_GATT_NOTIFICATION_VSEVT_CODE */
 
         /* USER CODE END BLECORE_EVT */
         default:
@@ -302,7 +287,7 @@ static SVCCTL_EvtAckStatus_t P2P_SERVER_EventHandler(void *p_Event)
   /* USER CODE END Service1_EventHandler_2 */
 
   return(return_value);
-}/* end P2P_SERVER_EventHandler */
+}/* end DATALOGGER_EventHandler */
 
 /* Public functions ----------------------------------------------------------*/
 
@@ -311,7 +296,7 @@ static SVCCTL_EvtAckStatus_t P2P_SERVER_EventHandler(void *p_Event)
  * @param  None
  * @retval None
  */
-void P2P_SERVER_Init(void)
+void DATALOGGER_Init(void)
 {
   Char_UUID_t  uuid;
   tBleStatus ret;
@@ -324,16 +309,16 @@ void P2P_SERVER_Init(void)
   /**
    *  Register the event handler to the BLE controller
    */
-  SVCCTL_RegisterSvcHandler(P2P_SERVER_EventHandler);
+  SVCCTL_RegisterSvcHandler(DATALOGGER_EventHandler);
 
   /**
-   * P2P_Server
+   * Datalogger
    *
    * Max_Attribute_Records = 1 + 2*2 + 1*no_of_char_with_notify_or_indicate_property + 1*no_of_char_with_broadcast_property
-   * service_max_attribute_record = 1 for P2P_Server +
-   *                                2 for LED_C +
-   *                                2 for SWITCH_C +
-   *                                1 for SWITCH_C configuration descriptor +
+   * service_max_attribute_record = 1 for Datalogger +
+   *                                2 for CFG_WRT +
+   *                                2 for CFG_NTFY +
+   *                                1 for CFG_NTFY configuration descriptor +
    *                              = 6
    * This value doesn't take into account number of descriptors manually added
    * In case of descriptors added, please update the max_attr_record value accordingly in the next SVCCTL_InitService User Section
@@ -345,72 +330,74 @@ void P2P_SERVER_Init(void)
 
   /* USER CODE END SVCCTL_InitService */
 
-  COPY_P2P_SERVER_UUID(uuid.Char_UUID_128);
+  COPY_DATALOGGER_UUID(uuid.Char_UUID_128);
   ret = aci_gatt_add_service(UUID_TYPE_128,
                              (Service_UUID_t *) &uuid,
                              PRIMARY_SERVICE,
                              max_attr_record,
-                             &(P2P_SERVER_Context.P2p_serverSvcHdle));
+                             &(DATALOGGER_Context.DataloggerSvcHdle));
   if (ret != BLE_STATUS_SUCCESS)
   {
-    LOG_INFO_APP("  Fail   : aci_gatt_add_service command: P2P_Server, error code: 0x%x \n", ret);
+    LOG_INFO_APP("  Fail   : aci_gatt_add_service command: Datalogger, error code: 0x%x \n", ret);
   }
   else
   {
-    LOG_INFO_APP("  Success: aci_gatt_add_service command: P2p_serverSvcHdle = 0x%04X\n",P2P_SERVER_Context.P2p_serverSvcHdle);
+    LOG_INFO_APP("  Success: aci_gatt_add_service command: DataloggerSvcHdle = 0x%04X\n",DATALOGGER_Context.DataloggerSvcHdle);
   }
 
   /**
-   * LED_C
+   * CFG_WRT
    */
-  COPY_LED_C_UUID(uuid.Char_UUID_128);
-  ret = aci_gatt_add_char(P2P_SERVER_Context.P2p_serverSvcHdle,
+  COPY_CFG_WRT_UUID(uuid.Char_UUID_128);
+  ret = aci_gatt_add_char(DATALOGGER_Context.DataloggerSvcHdle,
                           UUID_TYPE_128,
                           (Char_UUID_t *) &uuid,
-                          SizeLed_C,
+                          SizeCfg_Wrt,
                           CHAR_PROP_READ | CHAR_PROP_WRITE_WITHOUT_RESP,
                           ATTR_PERMISSION_NONE,
                           GATT_NOTIFY_ATTRIBUTE_WRITE,
                           0x10,
                           CHAR_VALUE_LEN_VARIABLE,
-                          &(P2P_SERVER_Context.Led_CCharHdle));
+                          &(DATALOGGER_Context.Cfg_WrtCharHdle));
   if (ret != BLE_STATUS_SUCCESS)
   {
-    LOG_INFO_APP("  Fail   : aci_gatt_add_char command   : LED_C, error code: 0x%2X\n", ret);
+    LOG_INFO_APP("  Fail   : aci_gatt_add_char command   : CFG_WRT, error code: 0x%2X\n", ret);
   }
   else
   {
-    LOG_INFO_APP("  Success: aci_gatt_add_char command   : Led_CCharHdle = 0x%04X\n",P2P_SERVER_Context.Led_CCharHdle);
+    LOG_INFO_APP("  Success: aci_gatt_add_char command   : Cfg_WrtCharHdle = 0x%04X\n",DATALOGGER_Context.Cfg_WrtCharHdle);
   }
 
   /* USER CODE BEGIN SVCCTL_InitService1Char1 */
+  /* Place holder for Characteristic Descriptors */
 
   /* USER CODE END SVCCTL_InitService1Char1 */
 
   /**
-   * SWITCH_C
+   * CFG_NTFY
    */
-  COPY_SWITCH_C_UUID(uuid.Char_UUID_128);
-  ret = aci_gatt_add_char(P2P_SERVER_Context.P2p_serverSvcHdle,
+  COPY_CFG_NTFY_UUID(uuid.Char_UUID_128);
+  ret = aci_gatt_add_char(DATALOGGER_Context.DataloggerSvcHdle,
                           UUID_TYPE_128,
                           (Char_UUID_t *) &uuid,
-                          SizeSwitch_C,
+                          SizeCfg_Ntfy,
                           CHAR_PROP_NOTIFY,
                           ATTR_PERMISSION_NONE,
                           GATT_NOTIFY_ATTRIBUTE_WRITE,
                           0x10,
                           CHAR_VALUE_LEN_VARIABLE,
-                          &(P2P_SERVER_Context.Switch_CCharHdle));
+                          &(DATALOGGER_Context.Cfg_NtfyCharHdle));
   if (ret != BLE_STATUS_SUCCESS)
   {
-    LOG_INFO_APP("  Fail   : aci_gatt_add_char command   : SWITCH_C, error code: 0x%2X\n", ret);
+    LOG_INFO_APP("  Fail   : aci_gatt_add_char command   : CFG_NTFY, error code: 0x%2X\n", ret);
   }
   else
   {
-    LOG_INFO_APP("  Success: aci_gatt_add_char command   : Switch_CCharHdle = 0x%04X\n",P2P_SERVER_Context.Switch_CCharHdle);
+    LOG_INFO_APP("  Success: aci_gatt_add_char command   : Cfg_NtfyCharHdle = 0x%04X\n",DATALOGGER_Context.Cfg_NtfyCharHdle);
   }
 
   /* USER CODE BEGIN SVCCTL_InitService1Char2 */
+  /* Place holder for Characteristic Descriptors */
 
   /* USER CODE END SVCCTL_InitService1Char2 */
 
@@ -427,7 +414,7 @@ void P2P_SERVER_Init(void)
  * @param  pData: Structure holding data to update
  *
  */
-tBleStatus P2P_SERVER_UpdateValue(P2P_SERVER_CharOpcode_t CharOpcode, P2P_SERVER_Data_t *pData)
+tBleStatus DATALOGGER_UpdateValue(DATALOGGER_CharOpcode_t CharOpcode, DATALOGGER_Data_t *pData)
 {
   tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
   /* USER CODE BEGIN Service1_App_Update_Char_1 */
@@ -436,38 +423,38 @@ tBleStatus P2P_SERVER_UpdateValue(P2P_SERVER_CharOpcode_t CharOpcode, P2P_SERVER
 
   switch(CharOpcode)
   {
-    case P2P_SERVER_LED_C:
-      ret = aci_gatt_update_char_value(P2P_SERVER_Context.P2p_serverSvcHdle,
-                                       P2P_SERVER_Context.Led_CCharHdle,
+    case DATALOGGER_CFG_WRT:
+      ret = aci_gatt_update_char_value(DATALOGGER_Context.DataloggerSvcHdle,
+                                       DATALOGGER_Context.Cfg_WrtCharHdle,
                                        0, /* charValOffset */
                                        pData->Length, /* charValueLen */
                                        (uint8_t *)pData->p_Payload);
       if (ret != BLE_STATUS_SUCCESS)
       {
-        LOG_DEBUG_APP("  Fail   : aci_gatt_update_char_value LED_C command, error code: 0x%2X\n", ret);
+        LOG_DEBUG_APP("  Fail   : aci_gatt_update_char_value CFG_WRT command, error code: 0x%2X\n", ret);
       }
       else
       {
-        LOG_DEBUG_APP("  Success: aci_gatt_update_char_value LED_C command\n");
+        LOG_DEBUG_APP("  Success: aci_gatt_update_char_value CFG_WRT command\n");
       }
       /* USER CODE BEGIN Service1_Char_Value_1 */
 
       /* USER CODE END Service1_Char_Value_1 */
       break;
 
-    case P2P_SERVER_SWITCH_C:
-      ret = aci_gatt_update_char_value(P2P_SERVER_Context.P2p_serverSvcHdle,
-                                       P2P_SERVER_Context.Switch_CCharHdle,
+    case DATALOGGER_CFG_NTFY:
+      ret = aci_gatt_update_char_value(DATALOGGER_Context.DataloggerSvcHdle,
+                                       DATALOGGER_Context.Cfg_NtfyCharHdle,
                                        0, /* charValOffset */
                                        pData->Length, /* charValueLen */
                                        (uint8_t *)pData->p_Payload);
       if (ret != BLE_STATUS_SUCCESS)
       {
-        LOG_DEBUG_APP("  Fail   : aci_gatt_update_char_value SWITCH_C command, error code: 0x%2X\n", ret);
+        LOG_DEBUG_APP("  Fail   : aci_gatt_update_char_value CFG_NTFY command, error code: 0x%2X\n", ret);
       }
       else
       {
-        LOG_DEBUG_APP("  Success: aci_gatt_update_char_value SWITCH_C command\n");
+        LOG_DEBUG_APP("  Success: aci_gatt_update_char_value CFG_NTFY command\n");
       }
       /* USER CODE BEGIN Service1_Char_Value_2 */
 

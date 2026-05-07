@@ -458,6 +458,7 @@ void modem_cipsend(const char *param) {
 			LOG_INFO_APP(
 					"Modem CIPSEND connection %d sent data successfully, length %d\r\n",
 					conn_id, reqSendLength);
+					Send_Data_Done();
 		} else {
 			LOG_INFO_APP(
 					"Modem CIPSEND connection %d failed to send data, req length %d, cnf length %d\r\n",
@@ -736,7 +737,7 @@ static void Send_Cellular_Command_Req(void *arg) {
 	case AT_CGDCONT: //AT+CGDCONT=1,"IP","<apn>"
 		char ATCGDCONT[50];
 		tsnprintf(ATCGDCONT, sizeof(ATCGDCONT),
-				"AT+CGDCONT=1,\"ip\",\"%s\"\r\n", app_config.apn);
+				"AT+CGDCONT=1,\"ip\",\"%s\"\r\n", app_config.config.apn);
 		GSM_Uart_Transmit((uint8_t*) ATCGDCONT, strlen(ATCGDCONT));
 		break;
 	case AT_CNTP_SET: //AT+CNTP="time.nist.gov",123
@@ -758,7 +759,7 @@ static void Send_Cellular_Command_Req(void *arg) {
 	case AT_CDNSGIP: //AT+CDNSGIP="
 		const char *cmd8 = "AT+CDNSGIP=\"%s\"\r\n";
 		char ATCDNSGIP[50];
-		tsnprintf(ATCDNSGIP, sizeof(ATCDNSGIP), cmd8, app_config.server_addr);
+		tsnprintf(ATCDNSGIP, sizeof(ATCDNSGIP), cmd8, app_config.config.server_addr);
 		GSM_Uart_Transmit((uint8_t*) ATCDNSGIP, strlen(ATCDNSGIP));
 		break;
 	case AT_CIPRXGET_SET: //AT+CIPRXGET=1
@@ -768,18 +769,18 @@ static void Send_Cellular_Command_Req(void *arg) {
 	case AT_CIPOPEN: //AT+CIPOPEN=1,"TCP","<server>",<port>
 		char ATCIPOPEN[100];
 		tsnprintf(ATCIPOPEN, sizeof(ATCIPOPEN),
-				"AT+CIPOPEN=1,\"TCP\",\"%s\",%d\r\n", app_config.server_addr,
-				app_config.server_port);
+				"AT+CIPOPEN=1,\"TCP\",\"%s\",%d\r\n", app_config.config.server_addr,
+				app_config.config.server_port);
 		GSM_Uart_Transmit((uint8_t*) ATCIPOPEN, strlen(ATCIPOPEN));
 		break;
 	case AT_CIPSEND: //AT+CIPSEND=1,size
 		const char *cmd11 = "AT+CIPSEND=1,%d\r\n";
 		char ATCIPSEND[50];
-		tsnprintf(ATCIPSEND, sizeof(ATCIPSEND), cmd11, sizeof(pzem_payload));
+		tsnprintf(ATCIPSEND, sizeof(ATCIPSEND), cmd11, payload.BufferSize);
 		GSM_Uart_Transmit((uint8_t*) ATCIPSEND, strlen(ATCIPSEND));
 		break;
 	case AT_SEND: //send data
-		GSM_Uart_Transmit(pzem_payload, sizeof(pzem_payload));
+		GSM_Uart_Transmit(payload.Buffer, payload.BufferSize);
 		break;
 	case AT_CIPRXGET_READ: //AT+CIPRXGET=3,1,12
 		const char *cmd12 = "AT+CIPRXGET=3,1,12\r\n";

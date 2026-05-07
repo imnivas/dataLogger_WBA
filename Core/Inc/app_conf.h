@@ -344,7 +344,7 @@ extern UART_HandleTypeDef           huart1;
  *   the value assigned to the define is :
  *   (1U << LOG_REGION_BLE | 1U << LOG_REGION_APP)
  ******************************************************************************/
-#define APPLI_CONFIG_LOG_LEVEL      LOG_VERBOSE_INFO
+#define APPLI_CONFIG_LOG_LEVEL      LOG_VERBOSE_ALL_LOGS
 #define APPLI_CONFIG_LOG_REGION     (LOG_REGION_ALL_REGIONS)
 /* USER CODE BEGIN Log_level */
 
