@@ -61,7 +61,7 @@ int cgreg_n = 0;
 int cgreg_stat = -1;
 int network_opened = 0;
 int tcp_udp_network_opened = 0;
-int ntp_request_retry = 5;
+int ntp_request_retry = 2;
 int network_register_retry = 5;
 int data_register_retry = 5;
 int cip_close = -1;
@@ -69,7 +69,7 @@ uint32_t timer_period_modem_init_ms = 60000;
 uint32_t timer_period_modem_cmd_ms = 200;
 
 #define CMD_SIZE                        540
-#define CIRC_BUFF_SIZE                  50
+#define CIRC_BUFF_SIZE                  256
 ///* Character added when a RX error has been detected */
 #define AT_ERROR_RX_CHAR 0x01
 
@@ -124,7 +124,8 @@ void do_nothing(const char *param);
 void GSM_Uart_Transmit(uint8_t *p_data, uint16_t size);
 
 typedef enum AT_COMMANDS_SEQUENCE_e {
-	AT_CREG = 0, AT_CGREG, // =1,
+	AT_E0 = 0,       // disable echo
+	AT_CREG, AT_CGREG, // =1,2
 	AT_CPSI, //=2
 	AT_CSQ, // =3,
 	AT_CREG_QUERY, // = 4,
@@ -458,13 +459,14 @@ void modem_cipsend(const char *param) {
 			LOG_INFO_APP(
 					"Modem CIPSEND connection %d sent data successfully, length %d\r\n",
 					conn_id, reqSendLength);
-					Send_Data_Done();
 		} else {
 			LOG_INFO_APP(
 					"Modem CIPSEND connection %d failed to send data, req length %d, cnf length %d\r\n",
 					conn_id, reqSendLength, cnfSendLength);
-					Send_Data_Done();
 		}
+		current_command = AT_CIPCLOSE;
+		UTIL_TIMER_StartWithPeriod(&cellularContext.cellular_command_timer_Id,
+				timer_period_modem_cmd_ms);
 	} else {
 		LOG_INFO_APP("Modem CIPSEND parse error\r\n");
 	}
@@ -522,8 +524,7 @@ void modem_ok_resp(const char *param) {
 	//move to next command only if not in the middle of network open, cipopen, cipsend, cntp get, send data, ciprxget read
 	if (current_command != AT_NETOPEN && current_command != AT_CIPOPEN
 			&& current_command != AT_CIPSEND && current_command != AT_CNTP_GET
-			&& current_command != AT_SEND && current_command != AT_CIPRXGET_READ
-			&& current_command != AT_CIPCLOSE) {
+			&& current_command != AT_SEND && current_command != AT_CIPRXGET_READ) {
 
 //		if (creg_stat == 1 || creg_stat == 5 || creg_stat == -1) {
 		current_command++;
@@ -706,6 +707,9 @@ static void Send_Cellular_Command_Req(void *arg) {
 //	command_to_modem(current_command);
 
 	switch (current_command) {
+	case AT_E0: //ATE0 — disable echo so binary payload isn't parsed as AT response
+		GSM_Uart_Transmit((uint8_t *)"ATE0\r\n", 6);
+		break;
 	case AT_CREG: //AT+CREG=1
 		const char *cmd = "AT+CREG=1\r\n";
 		GSM_Uart_Transmit((uint8_t*) cmd, strlen(cmd));
@@ -780,8 +784,14 @@ static void Send_Cellular_Command_Req(void *arg) {
 		GSM_Uart_Transmit((uint8_t*) ATCIPSEND, strlen(ATCIPSEND));
 		break;
 	case AT_SEND: //send data
+	{
+		LOG_INFO_APP("TX payload (%d bytes):\r\n", payload.BufferSize);
+		for (uint8_t _i = 0; _i < payload.BufferSize; _i++)
+			LOG_INFO_APP(" %02X", payload.Buffer[_i]);
+		LOG_INFO_APP("\r\n");
 		GSM_Uart_Transmit(payload.Buffer, payload.BufferSize);
 		break;
+	}
 	case AT_CIPRXGET_READ: //AT+CIPRXGET=3,1,12
 		const char *cmd12 = "AT+CIPRXGET=3,1,12\r\n";
 		GSM_Uart_Transmit((uint8_t*) cmd12, strlen(cmd12));

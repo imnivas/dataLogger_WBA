@@ -13,9 +13,11 @@
 /* ---- App Config --------------------------------------------------------- */
 #define APP_CONFIG_FLASH_ADDR   0x080FA000U
 #define APP_CONFIG_MAGIC        0xAD550001U
-#define APP_CONFIG_VERSION      2U
+#define APP_CONFIG_VERSION      4U
 #define USER_CONFIG_FRAME_HEAD  0xAD55U
 #define APP_CONFIG_FLASH_SECTOR 125U
+#define APP_CONFIG_FIRMWARE_VERSION 0x0200u /* 2.0 in BCD format */
+#define APP_CONFIG_HARDWARE_VERSION 0x0001u /* 1 in BCD format */
 
 typedef struct __attribute__((packed)) {
     uint16_t frame_head;          /* must equal USER_CONFIG_FRAME_HEAD on BLE write */
@@ -26,14 +28,16 @@ typedef struct __attribute__((packed)) {
     uint32_t send_interval_mins;
     uint8_t  eui64[8];            /* populated from LL_FLASH at boot, ignored on BLE write */
     uint8_t  ble_addr[6];         /* populated from LL_FLASH at boot, ignored on BLE write */
-} UserConfig_t;                   /* 119 bytes */
+    uint16_t fw_version;          /* populated from APP_CONFIG_FIRMWARE_VERSION at boot, ignored on BLE write */
+    uint16_t hw_version;          /* populated from APP_CONFIG_HARDWARE_VERSION at boot, ignored on BLE write */
+} UserConfig_t;                   /* 123 bytes */
 
 typedef struct __attribute__((packed)) {
-    uint32_t     magic;           /* APP_CONFIG_MAGIC — flash validity marker */
+    uint32_t     magic1;          /* APP_CONFIG_MAGIC — start marker */
     uint32_t     version;         /* APP_CONFIG_VERSION */
-    UserConfig_t config;          /* 119 bytes — user data */
-    uint8_t      _pad[1];         /* pad to 128 bytes = 32 × uint32_t */
-} AppConfig_t;                    /* 128 bytes */
+    UserConfig_t config;          /* 123 bytes — user data */
+    uint32_t     magic2;          /* APP_CONFIG_MAGIC — end marker, validates full write */
+} AppConfig_t;                    /* 135 bytes */
 
 extern AppConfig_t app_config;
 
@@ -48,7 +52,7 @@ void RS485_ReadPZEM(void);
 
 
 /* ---- TCP Packet ---------------------------------------------------------- */
-#define MAX_PAYLOAD_SIZE  23u   /* ADC(3) + RS485(20) */
+#define MAX_PAYLOAD_SIZE  27u   /* FW(2) + HW(2) + ADC(3) + RS485(20) */
 
 typedef struct __attribute__((packed)) {
     uint8_t  EUI[8];

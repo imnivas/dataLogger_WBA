@@ -95,12 +95,15 @@ void AppConfig_FillHwIds(void)
     app_config.config.ble_addr[3] = (uint8_t)(company_id & 0xFF);
     app_config.config.ble_addr[4] = (uint8_t)((company_id >> 8) & 0xFF);
     app_config.config.ble_addr[5] = (uint8_t)((company_id >> 16) & 0xFF);
+
+    app_config.config.fw_version = APP_CONFIG_FIRMWARE_VERSION;
+    app_config.config.hw_version = APP_CONFIG_HARDWARE_VERSION;
 }
 
 static void AppConfig_ApplyDefaults(void)
 {
     memset(&app_config, 0, sizeof(app_config));
-    app_config.magic                       = APP_CONFIG_MAGIC;
+    app_config.magic1                      = APP_CONFIG_MAGIC;
     app_config.version                     = APP_CONFIG_VERSION;
     app_config.config.frame_head           = USER_CONFIG_FRAME_HEAD;
     strncpy(app_config.config.apn,         "airtelgprs.com",    sizeof(app_config.config.apn) - 1);
@@ -113,7 +116,7 @@ static void AppConfig_ApplyDefaults(void)
 void AppConfig_Load(void)
 {
     const AppConfig_t *f = (const AppConfig_t *)APP_CONFIG_FLASH_ADDR;
-    if (f->magic == APP_CONFIG_MAGIC) {
+    if (f->magic1 == APP_CONFIG_MAGIC && f->magic2 == APP_CONFIG_MAGIC) {
         memcpy(&app_config, f, sizeof(AppConfig_t));
         LOG_INFO_APP("AppConfig: loaded from flash\r\n");
     } else {
@@ -127,8 +130,9 @@ void AppConfig_Load(void)
 
 void AppConfig_Save(void)
 {
-    app_config.magic   = APP_CONFIG_MAGIC;
+    app_config.magic1  = APP_CONFIG_MAGIC;
     app_config.version = APP_CONFIG_VERSION;
+    app_config.magic2  = APP_CONFIG_MAGIC;
     FM_Erase(APP_CONFIG_FLASH_SECTOR, 1, &fm_erase_cb_node);
 }
 
@@ -161,6 +165,8 @@ void UserApplicationInit(void) {
 
 	AppConfig_Load();
 	Log_EUI64();
+    LOG_INFO_APP("Firmware Version: 0x%04X\r\n", APP_CONFIG_FIRMWARE_VERSION);
+    LOG_INFO_APP("Hardware Version: 0x%04X\r\n", APP_CONFIG_HARDWARE_VERSION);
 
 	VREFMEAS_Init();
 	CAPMEAS_Init();
@@ -226,14 +232,14 @@ void RS485_ReadPZEM(void) {
 		} else {
 			LOG_INFO_APP("PZEM-016 bad response: got %02X %02X %02X (expected 02 04 14)\r\n",
 					buf[0], buf[1], buf[2]);
-			LOG_INFO_APP("PZEM raw[0..9]:  %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\r\n",
+		}
+        LOG_INFO_APP("PZEM raw[0..9]:  %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\r\n",
 					buf[0], buf[1], buf[2], buf[3], buf[4],
 					buf[5], buf[6], buf[7], buf[8], buf[9]);
 			LOG_INFO_APP("PZEM raw[10..24]: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\r\n",
 					buf[10], buf[11], buf[12], buf[13], buf[14],
 					buf[15], buf[16], buf[17], buf[18], buf[19],
 					buf[20], buf[21], buf[22], buf[23], buf[24]);
-		}
 	} else {
 		LOG_INFO_APP("PZEM-016 timeout (HAL_UART_Receive returned error)\r\n");
 	}
@@ -267,6 +273,8 @@ void BuildPayload(void) {
 
     /* Fill data payload buffer — track actual length written */
     uint16_t plen = 0;
+    memcpy(&tcp_payload_buf[plen], &app_config.config.fw_version, sizeof(uint16_t)); plen += 2;
+    memcpy(&tcp_payload_buf[plen], &app_config.config.hw_version, sizeof(uint16_t)); plen += 2;
     tcp_payload_buf[plen++] = adc.u8Vref_V;
     tcp_payload_buf[plen++] = adc.u8Bkup_V;
     tcp_payload_buf[plen++] = adc.u8Temp_C;
@@ -394,13 +402,18 @@ ADCValue_t ReadVolatges(void) {
     uint16_t Vref = VREFMEAS_RequestVrefMeasurement();
     uint16_t Vcap = CAPMEAS_RequestCapMeasurement();
 
-    /* Read temperature using the existing temp_measurement module handle */
+    /* Read temperature: use raw count + actual Vdda for accurate calibration.
+     * ADCCTRL_RequestTemperature uses hardcoded VDDA_APPLI=3300mV which
+     * differs from the measured supply, causing a fixed offset error. */
     int16_t temp_raw = 0;
+    uint16_t temp_adc_raw = 0;
     UTILS_ENTER_LIMITED_CRITICAL_SECTION(RCC_INTR_PRIO << 4);
     ADCCTRL_RequestIpState(&LLTempRequest_Handle, ADC_ON);
-    ADCCTRL_RequestTemperature(&LLTempRequest_Handle, &temp_raw);
+    ADCCTRL_RequestRawValue(&LLTempRequest_Handle, &temp_adc_raw);
     ADCCTRL_RequestIpState(&LLTempRequest_Handle, ADC_OFF);
     UTILS_EXIT_LIMITED_CRITICAL_SECTION();
+    temp_raw = (int16_t)__LL_ADC_CALC_TEMPERATURE(Vref, temp_adc_raw,
+                                                   LL_ADC_RESOLUTION_12B);
 
     /* Encode: u8Temp_C = temp + 40 (covers -40..+215 °C); u16Temp_C = raw °C */
     int16_t encoded = temp_raw + TEMPMEAS_MIN_TEMP_LIMIT;
@@ -414,7 +427,7 @@ ADCValue_t ReadVolatges(void) {
 
     LOG_INFO_APP("Vref: %d mV\r\n", Vref);
     LOG_INFO_APP("Vcap raw: %d\r\n", Vcap);
-    LOG_INFO_APP("Temp: %d C (encoded u8=%d)\r\n", (int)temp_raw, Temp);
+    LOG_INFO_APP("Temp: %d C (raw=%u, encoded u8=%d)\r\n", (int)temp_raw, temp_adc_raw, Temp);
 
     if (Vref < 2000) Vref = 2000;
     mV.u8Vref_V = (uint8_t)((Vref / 10) - 200);
