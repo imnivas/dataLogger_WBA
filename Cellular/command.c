@@ -24,8 +24,8 @@
 #include "stm32_timer.h"
 #include "log_module.h"
 #include "usart.h"
-#include "time.h"
 #include "application.h"
+#include "stm32_systime.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /**
@@ -603,22 +603,24 @@ void modem_cclk(const char *param) {
 					&day, &hour, &min, &sec, &tz)) {
 		LOG_INFO_APP("Modem CCLK parse date time :%d-%d-%d %d:%d:%d tz:%d\r\n",
 				year, month, day, hour, min, sec, tz);
-		//convert to epoch time
-		struct tm t;
-		t.tm_year = year + 100; // years since 1900
-		t.tm_mon = month - 1; // months since January
-		t.tm_mday = day; // day of the month
-		t.tm_hour = hour; // hours since midnight
-		t.tm_min = min; // minutes after the hour
-		t.tm_sec = sec; // seconds after the minute
-		t.tm_isdst = -1; // not considering daylight saving time
+		/* Manual Unix epoch — avoids broken mktime on this libc.
+		 * yy is 2-digit year relative to 2000 (e.g. 26 = 2026). */
+		static const uint16_t yday[12] = {0,31,59,90,120,151,181,212,243,273,304,334};
+		int y = 2000 + year - 1970;
+		uint32_t days = (uint32_t)y * 365u + (uint32_t)((y + 1) / 4);
+		days += yday[month - 1];
+		if (month > 2 && ((2000 + year) % 4 == 0)) days++;
+		days += (uint32_t)(day - 1);
+		uint32_t epoch_time = days * 86400u
+		                    + (uint32_t)hour * 3600u
+		                    + (uint32_t)min  * 60u
+		                    + (uint32_t)sec;
+		epoch_time -= (uint32_t)tz * 900u; /* quarter-hour TZ offset to UTC */
 
-		time_t epoch_time = mktime(&t);
-		if (epoch_time != (time_t) -1) {
-			LOG_INFO_APP("Modem CCLK epoch time :%ld\r\n", epoch_time);
-		} else {
-			LOG_INFO_APP("Modem CCLK epoch time conversion error\r\n");
-		}
+		LOG_INFO_APP("Modem CCLK epoch time :%lu\r\n", (unsigned long)epoch_time);
+		SysTime_t sysTime = { .Seconds = epoch_time, .SubSeconds = 0 };
+		SysTimeSet(sysTime);
+		LOG_INFO_APP("SysTime set to %lu\r\n", (unsigned long)epoch_time);
 	} else {
 		LOG_INFO_APP("Modem CCLK parse date time error\r\n");
 	}
