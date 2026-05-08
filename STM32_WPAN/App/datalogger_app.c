@@ -87,10 +87,9 @@ static UTIL_TIMER_Object_t notif_delay_timer;
 
 /* Private function prototypes -----------------------------------------------*/
 static void DATALOGGER_Cfg_ntfy_SendNotification(void);
-static void DATALOGGER_NotifDelay_TimerCb(void *arg);
 
 /* USER CODE BEGIN PFP */
-
+static void DATALOGGER_NotifDelay_TimerCb(void *arg);
 /* USER CODE END PFP */
 
 /* Functions Definition ------------------------------------------------------*/
