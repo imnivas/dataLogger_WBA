@@ -9,14 +9,15 @@
 #define APPLICATION_USER_USERAPPLICATION_APPLICATION_H_
 
 #include <stdint.h>
+#include "stm32_timer.h"
 
 /* ---- App Config --------------------------------------------------------- */
 #define APP_CONFIG_FLASH_ADDR   0x080FA000U
-#define APP_CONFIG_MAGIC        0xAD550001U
-#define APP_CONFIG_VERSION      4U
+#define APP_CONFIG_MAGIC        0xAD550002U
+#define APP_CONFIG_VERSION      5U
 #define USER_CONFIG_FRAME_HEAD  0xAD55U
 #define APP_CONFIG_FLASH_SECTOR 125U
-#define APP_CONFIG_FIRMWARE_VERSION 0x0200u /* 2.0 in BCD format */
+#define APP_CONFIG_FIRMWARE_VERSION 0x0100u /* 1.0 in BCD format */
 #define APP_CONFIG_HARDWARE_VERSION 0x0001u /* 1 in BCD format */
 
 typedef struct __attribute__((packed)) {
@@ -30,7 +31,8 @@ typedef struct __attribute__((packed)) {
     uint8_t  ble_addr[6];         /* populated from LL_FLASH at boot, ignored on BLE write */
     uint16_t fw_version;          /* populated from APP_CONFIG_FIRMWARE_VERSION at boot, ignored on BLE write */
     uint16_t hw_version;          /* populated from APP_CONFIG_HARDWARE_VERSION at boot, ignored on BLE write */
-} UserConfig_t;                   /* 123 bytes */
+    uint8_t  u8Vref_V;            /* supply voltage encoded: (val+200)*10 mV; refreshed on BLE connect */
+} UserConfig_t;                   /* 124 bytes */
 
 typedef struct __attribute__((packed)) {
     uint32_t     magic1;          /* APP_CONFIG_MAGIC — start marker */
@@ -40,6 +42,14 @@ typedef struct __attribute__((packed)) {
 } AppConfig_t;                    /* 135 bytes */
 
 extern AppConfig_t app_config;
+
+typedef struct {
+    UTIL_TIMER_Object_t SEND_Data_timer_Id;
+    UTIL_TIMER_Object_t Advertising_mgr_timer_Id;
+    UTIL_TIMER_Object_t Reset_Initate_timer_Id;
+} ApplicationContext_t;
+
+extern ApplicationContext_t applicationContext;
 
 void AppConfig_Load(void);
 void AppConfig_Save(void);

@@ -24,12 +24,7 @@
 #include "stm32wbaxx_ll_adc.h"
 #include "stm32_systime.h"
 
-typedef struct {
-	UTIL_TIMER_Object_t SEND_Data_timer_Id;
-	UTIL_TIMER_Object_t Advertising_mgr_timer_Id;
-} ApplicationContext_t;
-
-static ApplicationContext_t applicationContext;
+ApplicationContext_t applicationContext;
 
 uint8_t pzem_payload[20] = {0};
 
@@ -111,7 +106,7 @@ static void AppConfig_ApplyDefaults(void)
     strncpy(app_config.config.server_addr, "platform.adarko.io", sizeof(app_config.config.server_addr) - 1);
     app_config.config.server_port          = 8900;
     app_config.config.modbus_slave_id      = 2;
-    app_config.config.send_interval_mins   = 60;
+    app_config.config.send_interval_mins   = 1440; /* 24 hours */
 }
 
 void AppConfig_Load(void)
@@ -151,6 +146,8 @@ static void Log_EUI64(void)
 
 static void Send_Data_Req(void *arg);
 static void Send_Data(void);
+static void Reset_Initiate_Req(void *arg);
+static void Reset_Initiate(void);
 void MeterReadProcessInit(void);
 
 void UserApplicationInit(void) {
@@ -172,6 +169,14 @@ void UserApplicationInit(void) {
     LOG_INFO_APP("Firmware Version: 0x%04X\r\n", APP_CONFIG_FIRMWARE_VERSION);
     LOG_INFO_APP("Hardware Version: 0x%04X\r\n", APP_CONFIG_HARDWARE_VERSION);
 
+    //Display the loaded configuration values in the log
+    LOG_INFO_APP("APN: %s\r\n", app_config.config.apn);
+    LOG_INFO_APP("Server Address: %s\r\n", app_config.config.server_addr);
+    LOG_INFO_APP("Server Port: %d\r\n", app_config.config.server_port);
+    LOG_INFO_APP("Modbus Slave ID: %d\r\n", app_config.config.modbus_slave_id);
+    LOG_INFO_APP("Send Interval (mins): %d\r\n", app_config.config.send_interval_mins);
+
+
 	VREFMEAS_Init();
 	CAPMEAS_Init();
 	TEMPMEAS_Init();
@@ -182,14 +187,31 @@ void UserApplicationInit(void) {
 
 	UTIL_SEQ_RegTask(1U << CFG_TASK_CELLULAR_SEND_DATA, UTIL_SEQ_RFU,
 			Send_Data);
+    
+    UTIL_SEQ_RegTask(1U << CFG_TASK_RESET_INITIATE, UTIL_SEQ_RFU,
+			Reset_Initiate);
 
 	UTIL_TIMER_Create(&(applicationContext.SEND_Data_timer_Id), 0,
 			UTIL_TIMER_ONESHOT, &Send_Data_Req, 0);
+    
+    UTIL_TIMER_Create(&(applicationContext.Reset_Initate_timer_Id), 0,
+			UTIL_TIMER_ONESHOT, &Reset_Initiate_Req, 0);
 
 	/*First Data after boot will be in 5 Seconds*/
 	UTIL_TIMER_StartWithPeriod(&applicationContext.SEND_Data_timer_Id,
 			5000U);
 
+}
+
+static void Reset_Initiate_Req(void *arg) {
+    LOG_INFO_APP("Reset Initiate Req\n");
+    UTIL_TIMER_Stop(&applicationContext.Reset_Initate_timer_Id);
+    UTIL_SEQ_SetTask(1 << CFG_TASK_RESET_INITIATE, CFG_SEQ_PRIO_0);
+}
+
+static void Reset_Initiate(void) {
+    LOG_INFO_APP("Reset Initiate\n");
+    NVIC_SystemReset();
 }
 
 static void Send_Data_Req(void *arg) {

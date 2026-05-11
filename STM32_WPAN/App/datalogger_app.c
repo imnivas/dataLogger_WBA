@@ -126,6 +126,7 @@ void DATALOGGER_Notification(DATALOGGER_NotificationEvt_t *p_Notification)
               AppConfig_Save();
               LOG_INFO_APP("-- DATALOGGER : UserConfig received and saved\n");
               UTIL_TIMER_StartWithPeriod(&notif_delay_timer, 1000U);
+              UTIL_TIMER_StartWithPeriod(&applicationContext.Reset_Initate_timer_Id, 10000U);
             }
             else
             {
