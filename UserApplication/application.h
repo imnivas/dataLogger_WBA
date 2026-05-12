@@ -14,10 +14,10 @@
 /* ---- App Config --------------------------------------------------------- */
 #define APP_CONFIG_FLASH_ADDR   0x080FA000U
 #define APP_CONFIG_MAGIC        0xAD550002U
-#define APP_CONFIG_VERSION      5U
+#define APP_CONFIG_VERSION      6U
 #define USER_CONFIG_FRAME_HEAD  0xAD55U
 #define APP_CONFIG_FLASH_SECTOR 125U
-#define APP_CONFIG_FIRMWARE_VERSION 0x0100u /* 1.0 in BCD format */
+#define APP_CONFIG_FIRMWARE_VERSION 0x0102u /* 1.02 in BCD format */
 #define APP_CONFIG_HARDWARE_VERSION 0x0001u /* 1 in BCD format */
 
 typedef struct __attribute__((packed)) {
@@ -27,19 +27,20 @@ typedef struct __attribute__((packed)) {
     uint16_t server_port;
     uint8_t  modbus_slave_id;
     uint32_t send_interval_mins;
+    uint8_t  u8Vref_V;            /* supply voltage encoded: (val+200)*10 mV; refreshed on BLE connect */
+    uint8_t  u8Temp_C;            /* temperature encoded: val-40 °C; refreshed on BLE connect */
     uint8_t  eui64[8];            /* populated from LL_FLASH at boot, ignored on BLE write */
     uint8_t  ble_addr[6];         /* populated from LL_FLASH at boot, ignored on BLE write */
     uint16_t fw_version;          /* populated from APP_CONFIG_FIRMWARE_VERSION at boot, ignored on BLE write */
     uint16_t hw_version;          /* populated from APP_CONFIG_HARDWARE_VERSION at boot, ignored on BLE write */
-    uint8_t  u8Vref_V;            /* supply voltage encoded: (val+200)*10 mV; refreshed on BLE connect */
-} UserConfig_t;                   /* 124 bytes */
+} UserConfig_t;                   /* 125 bytes */
 
 typedef struct __attribute__((packed)) {
     uint32_t     magic1;          /* APP_CONFIG_MAGIC — start marker */
     uint32_t     version;         /* APP_CONFIG_VERSION */
     UserConfig_t config;          /* 123 bytes — user data */
     uint32_t     magic2;          /* APP_CONFIG_MAGIC — end marker, validates full write */
-} AppConfig_t;                    /* 135 bytes */
+} AppConfig_t;                    /* 136 bytes */
 
 extern AppConfig_t app_config;
 

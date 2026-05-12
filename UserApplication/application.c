@@ -181,6 +181,8 @@ void UserApplicationInit(void) {
 	CAPMEAS_Init();
 	TEMPMEAS_Init();
 
+    { ADCValue_t _adc = ReadVolatges(); app_config.config.u8Vref_V = _adc.u8Vref_V; app_config.config.u8Temp_C = _adc.u8Temp_C; }
+
 	tcp_packet.Data    = tcp_payload_buf;
 	payload.Buffer     = tx_buf;
 	payload.BufferSize = 0;

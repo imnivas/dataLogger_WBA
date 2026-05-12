@@ -125,6 +125,7 @@ void DATALOGGER_Notification(DATALOGGER_NotificationEvt_t *p_Notification)
               AppConfig_FillHwIds();
               AppConfig_Save();
               LOG_INFO_APP("-- DATALOGGER : UserConfig received and saved\n");
+              { ADCValue_t _adc = ReadVolatges(); app_config.config.u8Vref_V = _adc.u8Vref_V; app_config.config.u8Temp_C = _adc.u8Temp_C; }
               UTIL_TIMER_StartWithPeriod(&notif_delay_timer, 1000U);
               UTIL_TIMER_StartWithPeriod(&applicationContext.Reset_Initate_timer_Id, 10000U);
             }
@@ -147,6 +148,7 @@ void DATALOGGER_Notification(DATALOGGER_NotificationEvt_t *p_Notification)
       /* USER CODE BEGIN Service1Char2_NOTIFY_ENABLED_EVT */
       DATALOGGER_APP_Context.Cfg_ntfy_Notification_Status = Cfg_ntfy_NOTIFICATION_ON;
       LOG_INFO_APP("-- DATALOGGER : NOTIFICATION ENABLED\n");
+      { ADCValue_t _adc = ReadVolatges(); app_config.config.u8Vref_V = _adc.u8Vref_V; app_config.config.u8Temp_C = _adc.u8Temp_C; }
      // UTIL_SEQ_SetTask(1U << CFG_TASK_SEND_NOTIF_ID, CFG_SEQ_PRIO_0);
      UTIL_TIMER_StartWithPeriod(&notif_delay_timer, 1000U);
       /* USER CODE END Service1Char2_NOTIFY_ENABLED_EVT */
@@ -185,7 +187,7 @@ void DATALOGGER_APP_EvtRx(DATALOGGER_APP_ConnHandleNotEvt_t *p_Notification)
     case DATALOGGER_CONN_HANDLE_EVT :
       /* USER CODE BEGIN Service1_APP_CONN_HANDLE_EVT */
       DATALOGGER_APP_Context.ConnectionHandle = p_Notification->ConnectionHandle;
-      // UTIL_SEQ_SetTask(1U << CFG_TASK_SEND_NOTIF_ID, CFG_SEQ_PRIO_0);
+      { ADCValue_t _adc = ReadVolatges(); app_config.config.u8Vref_V = _adc.u8Vref_V; app_config.config.u8Temp_C = _adc.u8Temp_C; }
       UTIL_TIMER_StartWithPeriod(&notif_delay_timer, 1000U);
       /* USER CODE END Service1_APP_CONN_HANDLE_EVT */
       break;
