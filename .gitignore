@@ -9,3 +9,4 @@ STM32CubeIDE/Release/*
 !STM32CubeIDE/Debug/*.elf
 !STM32CubeIDE/Release/*.bin
 !STM32CubeIDE/Release/*.elf
+.stm32cubeide-workspace/

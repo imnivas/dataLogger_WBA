@@ -76,8 +76,14 @@ AT → SIM ready → CREG/CGREG (network reg) → CSQ (signal) → CPSI (network
 ## Build / Edit Workflow
 
 - **Edit code:** VSCode only
-- **Compile & flash:** STM32CubeIDE only — do not attempt CLI builds
-- **Peripheral config:** `BLE_p2pServer_ota.ioc` is managed by STM32CubeMX — do not hand-edit this file
+- **Compile/clean:** `./scripts/build.sh <build|clean> [--release|--debug]` (config defaults to `--release` if omitted):
+  - `./scripts/build.sh build --release` / `--debug` — headless STM32CubeIDE build (Eclipse/CDT `-cleanBuild`), no GUI needed. Output streams live to the terminal (via `tee`) so it doesn't look hung during a long build.
+  - `./scripts/build.sh clean --release` / `--debug` — cleans that config's build output. The headless builder has no standalone clean-only flag, so this runs `make clean` directly against the generated makefile in `STM32CubeIDE/<Config>/` (the same target STM32CubeIDE's GUI "Clean" action uses).
+  - Auto-detects `STM32CubeIDE.app` under `/Applications`, or set `STM32CUBEIDE_APP=/path/to/STM32CubeIDE.app` to override.
+  - Imports the project into a disposable workspace (`.stm32cubeide-workspace/`, gitignored) so it never touches your interactive IDE workspace/`.metadata`.
+  - Building in STM32CubeIDE's GUI is also fully supported and behaves identically — the script just runs the same headless Eclipse/CDT builder STM32CubeIDE uses internally.
+- **Flash:** STM32CubeIDE only — the script does not flash
+- **Peripheral config:** `BLE_p2pServer_ota.ioc` is managed by STM32CubeMX — do not hand-edit this file. Pin/peripheral reassignment must still be done via STM32CubeIDE's CubeMX editor (saving the `.ioc` regenerates code); the CLI script only compiles/cleans existing sources, it never regenerates code from the `.ioc`
 - **Build configs:** Debug and Release both available in `STM32CubeIDE/`
 
 ---
