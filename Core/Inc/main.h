@@ -75,6 +75,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define CELLULAR_ANT_SW2_Pin GPIO_PIN_7
+#define CELLULAR_ANT_SW2_GPIO_Port GPIOA
 #define SLAVE_SW_Pin GPIO_PIN_5
 #define SLAVE_SW_GPIO_Port GPIOA
 #define SLAVE_TX_Pin GPIO_PIN_2
@@ -89,8 +91,8 @@ void Error_Handler(void);
 #define CELLULAR_TX_GPIO_Port GPIOA
 #define CELLULAR_RX_Pin GPIO_PIN_11
 #define CELLULAR_RX_GPIO_Port GPIOA
-#define CELLULAR_ANT_SW_Pin GPIO_PIN_15
-#define CELLULAR_ANT_SW_GPIO_Port GPIOB
+#define CELLULAR_ANT_SW1_Pin GPIO_PIN_15
+#define CELLULAR_ANT_SW1_GPIO_Port GPIOB
 #define SLAVE_RS485_DE_Pin GPIO_PIN_9
 #define SLAVE_RS485_DE_GPIO_Port GPIOA
 #define BOOST_MODE_ON_Pin GPIO_PIN_14

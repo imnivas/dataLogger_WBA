@@ -51,20 +51,20 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(SLAVE_SW_GPIO_Port, SLAVE_SW_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, CELLULAR_ANT_SW2_Pin|SLAVE_SW_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, CELLULAR_ANT_SW_Pin|BOOST_MODE_ON_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, CELLULAR_ANT_SW1_Pin|BOOST_MODE_ON_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : SLAVE_SW_Pin */
-  GPIO_InitStruct.Pin = SLAVE_SW_Pin;
+  /*Configure GPIO pins : CELLULAR_ANT_SW2_Pin SLAVE_SW_Pin */
+  GPIO_InitStruct.Pin = CELLULAR_ANT_SW2_Pin|SLAVE_SW_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(SLAVE_SW_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : CELLULAR_ANT_SW_Pin BOOST_MODE_ON_Pin */
-  GPIO_InitStruct.Pin = CELLULAR_ANT_SW_Pin|BOOST_MODE_ON_Pin;
+  /*Configure GPIO pins : CELLULAR_ANT_SW1_Pin BOOST_MODE_ON_Pin */
+  GPIO_InitStruct.Pin = CELLULAR_ANT_SW1_Pin|BOOST_MODE_ON_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

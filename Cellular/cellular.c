@@ -42,25 +42,35 @@ static void BoostMode_GPIO_Init(void) {
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(BOOST_MODE_ON_GPIO_Port, BOOST_MODE_ON_Pin, GPIO_PIN_RESET);
 
-	/*Configure GPIO pins : BOOST_Mode_Pin LTE_Switch_Pin */
-	GPIO_InitStruct.Pin = BOOST_MODE_ON_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(BOOST_MODE_ON_GPIO_Port, &GPIO_InitStruct);
+  /*Configure GPIO pins : CELLULAR_ANT_SW2_Pin SLAVE_SW_Pin */
+  GPIO_InitStruct.Pin = CELLULAR_ANT_SW2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : CELLULAR_ANT_SW1_Pin BOOST_MODE_ON_Pin */
+  GPIO_InitStruct.Pin = CELLULAR_ANT_SW1_Pin|BOOST_MODE_ON_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
 }
 
 static void BoostMode_Enable(void) {
 	BoostMode_GPIO_Init();
 	HAL_GPIO_WritePin(BOOST_MODE_ON_GPIO_Port, BOOST_MODE_ON_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(CELLULAR_ANT_SW_GPIO_Port, CELLULAR_ANT_SW_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(CELLULAR_ANT_SW1_GPIO_Port, CELLULAR_ANT_SW1_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(CELLULAR_ANT_SW2_GPIO_Port, CELLULAR_ANT_SW2_Pin, GPIO_PIN_RESET);
 	LOG_INFO_APP("BoostMode_Enable\n");
 }
 
 static void BoostMode_Disable(void) {
 	HAL_GPIO_WritePin(BOOST_MODE_ON_GPIO_Port, BOOST_MODE_ON_Pin,
 			GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(CELLULAR_ANT_SW_GPIO_Port, CELLULAR_ANT_SW_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(CELLULAR_ANT_SW1_GPIO_Port, CELLULAR_ANT_SW1_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(CELLULAR_ANT_SW2_GPIO_Port, CELLULAR_ANT_SW2_Pin, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(GPIOA, CELLULAR_TX_Pin | CELLULAR_RX_Pin, GPIO_PIN_RESET);
 	LOG_INFO_APP("BoostMode_Disable\n");
 }
