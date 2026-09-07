@@ -77,7 +77,6 @@ uint32_t timer_period_modem_response_ms = 60000;
 #define CMD_SIZE                        540
 #define CIRC_BUFF_SIZE                  256
 ///* Character added when a RX error has been detected */
-#define AT_ERROR_RX_CHAR 0x01
 
 static void (*RxCpltCallbackhlp1)(uint8_t *rxChar, uint16_t size, uint8_t error);
 
@@ -387,8 +386,7 @@ void modem_netopen(const char *param) {
 			&status)) {
 		if (status == 0) {
 			LOG_INFO_APP("Modem network opened\r\n");
-			/* PDP must be open before CNTP can reach the NTP server. */
-			current_command = AT_CNTP_SET;
+			current_command = AT_CDNSCFG;
 			ignore_next_ok = netopen_ok_seen == 0U;
 			netopen_ok_seen = 0;
 			UTIL_TIMER_StartWithPeriod(
@@ -461,7 +459,8 @@ void modem_cipopen(const char *param) {
 					timer_period_modem_cmd_ms);
 		} else {
 			LOG_INFO_APP(
-					"Modem CIPOPEN connection %d failed with status %d\r\n",
+					"Modem CIPOPEN connection %d failed with TCP status %d "
+					"(DNS succeeded; remote TCP connection was rejected or unavailable)\r\n",
 					conn_id, status);
 			Send_Data_Done();
 		}
@@ -557,13 +556,12 @@ void modem_ok_resp(const char *param) {
 
 	//move to next command only if not in the middle of network open, cipopen, cipsend, cntp get, send data, ciprxget read
 	if (current_command == AT_CGDCONT) {
-		/* AT+CGDCONT only defines the PDP context; open it before CNTP. */
-		current_command = AT_NETOPEN;
+		current_command = AT_CNTP_SET;
 		UTIL_TIMER_StartWithPeriod(
 				&cellularContext.cellular_command_timer_Id,
 				timer_period_modem_cmd_ms);
 	} else if (current_command == AT_CCLK) {
-		current_command = AT_CDNSCFG;
+		current_command = AT_NETOPEN;
 		UTIL_TIMER_StartWithPeriod(
 				&cellularContext.cellular_command_timer_Id,
 				timer_period_modem_cmd_ms);
@@ -843,7 +841,7 @@ static void Send_Cellular_Command_Req(void *arg) {
 				timer_period_modem_response_ms);
 		break;
 	case AT_CDNSCFG: //AT+CDNSCFG="
-		const char *cmd7 = "AT+CDNSCFG=\"8.8.8.8\",\"1.1.1.1\"\r\n";
+		const char *cmd7 = "AT+CDNSCFG=\"8.8.8.8\",\"8.8.4.4\"\r\n";
 		GSM_Uart_Transmit((uint8_t*) cmd7, strlen(cmd7));
 		break;
 	case AT_CDNSGIP: //AT+CDNSGIP="
@@ -988,17 +986,7 @@ void CMD_Process(void) {
 		//LOG_INFO_APP("%c", circBuffer[ridx]);
 #endif /* 0 */
 
-		if (circBuffer[ridx] == AT_ERROR_RX_CHAR) {
-			ridx++;
-			if (ridx == CIRC_BUFF_SIZE) {
-				ridx = 0;
-			}
-			UTILS_ENTER_CRITICAL_SECTION();
-			charCount--;
-			UTILS_EXIT_CRITICAL_SECTION();
-			com_error(AT_RX_ERROR);
-			i = 0;
-		} else if (circBuffer[ridx] == '>') {
+		if (circBuffer[ridx] == '>') {
 			ridx++;
 			if (ridx == CIRC_BUFF_SIZE) {
 				ridx = 0;
