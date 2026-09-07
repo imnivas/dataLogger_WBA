@@ -460,7 +460,7 @@ void modem_cipopen(const char *param) {
 		} else {
 			LOG_INFO_APP(
 					"Modem CIPOPEN connection %d failed with TCP status %d "
-					"(DNS succeeded; remote TCP connection was rejected or unavailable)\r\n",
+					"(hostname used after DNS resolution failed)\r\n",
 					conn_id, status);
 			Send_Data_Done();
 		}
