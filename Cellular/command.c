@@ -68,9 +68,11 @@ int data_register_retry = 5;
 int cip_close = -1;
 static uint8_t ignore_next_ok = 0;
 static uint8_t dns_result_pending = 0;
+static uint8_t dns_request_retry = 2;
 static uint8_t dns_ok_seen = 0;
 static uint8_t cntp_ok_seen = 0;
 static uint8_t netopen_ok_seen = 0;
+static uint8_t data_cycle_finished = 0;
 uint32_t timer_period_modem_init_ms = 60000;
 uint32_t timer_period_modem_cmd_ms = 200;
 uint32_t timer_period_modem_response_ms = 60000;
@@ -445,6 +447,7 @@ void modem_netopen(const char *param) {
 
 void modem_cdns_gip(const char *param) {
 	int result = -1;
+	int error_code = -1;
 
 	/* SIMCom responses are typically +CDNSGIP: 1,"host","ip" or : 0. */
 	if (1 == tiny_sscanf(param, " %d", &result) && result == 1) {
@@ -457,15 +460,35 @@ void modem_cdns_gip(const char *param) {
 		UTIL_TIMER_StartWithPeriod(
 				&cellularContext.cellular_command_timer_Id,
 				timer_period_modem_cmd_ms);
-	} else if (1 == tiny_sscanf(param, " %d", &result) && result != 1) {
+	} else if (2 == tiny_sscanf(param, " %d,%d", &result, &error_code)
+			&& result == 0) {
 		UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
-		LOG_INFO_APP("Modem DNS failed with status %d\r\n", result);
+		LOG_INFO_APP("Modem DNS failed with status %d, error %d\r\n",
+				result, error_code);
 		dns_result_pending = 0;
-		Send_Data_Done();
+		if (dns_request_retry > 0U) {
+			dns_request_retry--;
+			LOG_INFO_APP("Retrying DNS resolution (%d retries left)\r\n",
+					dns_request_retry);
+			current_command = AT_CDNSGIP;
+			dns_result_pending = 1;
+			UTIL_TIMER_StartWithPeriod(
+					&cellularContext.cellular_command_timer_Id, 1000);
+		} else if (data_cycle_finished == 0U) {
+			/* CIPOPEN can resolve hostnames itself on some modem firmware. */
+			LOG_INFO_APP("Modem DNS unavailable; trying direct TCP hostname open\r\n");
+			current_command = AT_CIPRXGET_SET;
+			UTIL_TIMER_StartWithPeriod(
+					&cellularContext.cellular_command_timer_Id,
+					timer_period_modem_cmd_ms);
+		}
 	} else {
 		UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
 		LOG_INFO_APP("Modem DNS parse error\r\n");
-		Send_Data_Done();
+		if (data_cycle_finished == 0U) {
+			data_cycle_finished = 1;
+			Send_Data_Done();
+		}
 	}
 }
 
@@ -585,8 +608,9 @@ void modem_ok_resp(const char *param) {
 				&cellularContext.cellular_command_timer_Id,
 				timer_period_modem_cmd_ms);
 	} else if (current_command == AT_CCLK) {
-		/* The data session is already open; continue with DNS/TCP setup. */
-		current_command = AT_CDNSCFG;
+		/* Keep modem-assigned DNS settings; do not overwrite them with invalid
+		 * public or placeholder addresses. */
+		current_command = AT_CDNSGIP;
 		UTIL_TIMER_StartWithPeriod(
 				&cellularContext.cellular_command_timer_Id,
 				timer_period_modem_cmd_ms);
@@ -623,7 +647,12 @@ void modem_ok_resp(const char *param) {
 void modem_error_resp(const char *param) {
 //	UTIL_TIMER_StartWithPeriod(&cellularContext.cellular_command_timer_Id,
 //			timer_period_modem_cmd_ms);
-	if (current_command == AT_CNTP_SET || current_command == AT_CNTP_GET) {
+	if (data_cycle_finished != 0U) {
+		return;
+	} else if (current_command == AT_CDNSGIP && dns_result_pending != 0U) {
+		/* +CDNSGIP already scheduled a retry; ignore its trailing ERROR. */
+		return;
+	} else if (current_command == AT_CNTP_SET || current_command == AT_CNTP_GET) {
 		LOG_INFO_APP("Modem CNTP command rejected; continuing without time sync\r\n");
 		modem_continue_without_ntp();
 	} else {
@@ -697,6 +726,13 @@ void modem_cclk(const char *param) {
 					&day, &hour, &min, &sec, &tz)) {
 		LOG_INFO_APP("Modem CCLK parse date time :%d-%d-%d %d:%d:%d tz:%d\r\n",
 				year, month, day, hour, min, sec, tz);
+		if ((year == 70 && month == 1 && day == 1)
+				|| month < 1 || month > 12 || day < 1 || day > 31
+				|| hour < 0 || hour > 23 || min < 0 || min > 59
+				|| sec < 0 || sec > 59) {
+			LOG_INFO_APP("Modem CCLK contains invalid/unset time; keeping current time\r\n");
+			return;
+		}
 		/* Manual Unix epoch — avoids broken mktime on this libc.
 		 * yy is 2-digit year relative to 2000 (e.g. 26 = 2026). */
 		static const uint16_t yday[12] = {0,31,59,90,120,151,181,212,243,273,304,334};
@@ -864,7 +900,8 @@ static void Send_Cellular_Command_Req(void *arg) {
 				timer_period_modem_response_ms);
 		break;
 	case AT_CDNSCFG: //AT+CDNSCFG="
-		const char *cmd7 = "AT+CDNSCFG=\"8.8.8.8\",\"8.8.4.4\"\r\n";
+		/* Use carrier-provided DNS; public DNS is often blocked on mobile APNs. */
+		const char *cmd7 = "AT+CDNSCFG=\"0.0.0.0\",\"0.0.0.0\"\r\n";
 		GSM_Uart_Transmit((uint8_t*) cmd7, strlen(cmd7));
 		break;
 	case AT_CDNSGIP: //AT+CDNSGIP="
@@ -937,7 +974,10 @@ static void modem_response_timeout(void *arg) {
 	LOG_INFO_APP("Modem response timeout in command %d\r\n", current_command);
 	UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
 	dns_result_pending = 0;
-	Send_Data_Done();
+	if (data_cycle_finished == 0U) {
+		data_cycle_finished = 1;
+		Send_Data_Done();
+	}
 }
 
 void CMD_Init(void (*CmdProcessNotify)(void)) {
@@ -967,9 +1007,11 @@ void CMD_Init(void (*CmdProcessNotify)(void)) {
 	cip_close = -1;
 	ignore_next_ok = 0;
 	dns_result_pending = 0;
+	dns_request_retry = 2;
 	dns_ok_seen = 0;
 	cntp_ok_seen = 0;
 	netopen_ok_seen = 0;
+	data_cycle_finished = 0;
 	UTIL_TIMER_Create(&(cellularContext.cellular_command_timer_Id), 0,
 			UTIL_TIMER_ONESHOT, &Send_Cellular_Command_Req, 0);
 	UTIL_TIMER_Create(&(cellularContext.cellular_response_timer_Id), 0,
