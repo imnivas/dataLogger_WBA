@@ -1,0 +1,40 @@
+Project: file:/C:/Users/Admin/DataLogger/dataLogger_WBA can't be found!
+Saving workspace.
+Stm32cubeidec:
+Java was started but returned exit code=1
+-Dosgi.requiredJavaVersion=1.8
+-Dosgi.instance.area.default=@user.home/STM32CubeIDE/workspace_2.2.0
+-Declipse.buildId=Version 2.2.0
+-DproductMaturityGrade=mm
+-Djdk.http.auth.tunneling.disabledSchemes=
+-XX:+UseG1GC
+-XX:+UseStringDeduplication
+-Xms256m
+-Xmx2048m
+-Djavax.net.ssl.trustStoreType=WINDOWS-ROOT
+-Djava.class.path=C:\ST\STM32CubeIDE_2.2.0\STM32CubeIDE\\plugins/org.eclipse.equinox.launcher_1.7.100.v20251111-0406.jar
+-os win32
+-ws win32
+-arch x86_64
+-launcher C:\ST\STM32CubeIDE_2.2.0\STM32CubeIDE\stm32cubeidec.exe
+-name Stm32cubeidec
+--launcher.library C:\ST\STM32CubeIDE_2.2.0\STM32CubeIDE\\plugins/org.eclipse.equinox.launcher.win32.win32.x86_64_1.2.1400.v20250801-0854\eclipse_11916.dll
+-startup C:\ST\STM32CubeIDE_2.2.0\STM32CubeIDE\\plugins/org.eclipse.equinox.launcher_1.7.100.v20251111-0406.jar
+--launcher.overrideVmargs
+-application org.eclipse.cdt.managedbuilder.core.headlessbuild
+-data .stm32cubeide-workspace
+-import .
+-cleanBuild BLE_p2pServer_ota/Debug
+-vm C:\ST\STM32CubeIDE_2.2.0\STM32CubeIDE\\plugins/com.st.stm32cube.ide.jre.win64_3.4.300.202604201452/jre/bin\server\jvm.dll
+-vmargs
+-Dosgi.requiredJavaVersion=1.8
+-Dosgi.instance.area.default=@user.home/STM32CubeIDE/workspace_2.2.0
+-Declipse.buildId=Version 2.2.0
+-DproductMaturityGrade=mm
+-Djdk.http.auth.tunneling.disabledSchemes=
+-XX:+UseG1GC
+-XX:+UseStringDeduplication
+-Xms256m
+-Xmx2048m
+-Djavax.net.ssl.trustStoreType=WINDOWS-ROOT
+-Djava.class.path=C:\ST\STM32CubeIDE_2.2.0\STM32CubeIDE\\plugins/org.eclipse.equinox.launcher_1.7.100.v20251111-0406.jar 
