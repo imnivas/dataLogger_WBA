@@ -62,16 +62,11 @@ int cgreg_n = 0;
 int cgreg_stat = -1;
 int network_opened = 0;
 int tcp_udp_network_opened = 0;
-int ntp_request_retry = 2;
-int network_register_retry = 5;
-int data_register_retry = 5;
 int cip_close = -1;
 static uint8_t ignore_next_ok = 0;
 static uint8_t dns_result_pending = 0;
-static uint8_t dns_request_retry = 2;
 static uint8_t dns_ok_seen = 0;
 static uint8_t ignore_dns_error = 0;
-static uint8_t tcp_use_numeric_ip = 0;
 static uint8_t cntp_ok_seen = 0;
 static uint8_t netopen_ok_seen = 0;
 static uint8_t data_cycle_finished = 0;
@@ -106,8 +101,6 @@ static void (*RxCpltCallbackhlp1)(uint8_t *rxChar, uint16_t size, uint8_t error)
 #define MODEM_CIPSEND_READY ">"
 #define MODEM_IPCLOSE 		"+IPCLOSE"
 #define MODEM_CIPCLOSE 		"+CIPCLOSE"
-#define DEFAULT_SERVER_HOST	"platform.adarko.io"
-#define DEFAULT_SERVER_IP	"174.138.120.173"
 
 #define MODEM_USER_DL_HEADER "901A"
 
@@ -345,16 +338,8 @@ void modem_creg(const char *param) {
 			execute_next_command = 1;
 			LOG_INFO_APP("Modem registered, roaming\r\n");
 		} else {
-			LOG_INFO_APP("Modem not registered\r\n");
-			if (network_register_retry > 0) {
-				current_command = AT_CREG_QUERY;
-				network_register_retry--;
-			} else {
-				current_command = AT_CGREG_QUERY;
-			}
-			UTIL_TIMER_StartWithPeriod(
-					&cellularContext.cellular_command_timer_Id,
-					timer_period_modem_cmd_ms);
+			LOG_INFO_APP("Modem CREG registration failed; ending cellular cycle\r\n");
+			Send_Data_Done();
 		}
 	} else {
 		LOG_INFO_APP("Modem CREG parse error\r\n");
@@ -373,16 +358,8 @@ void modem_cgreg(const char *param) {
 			execute_next_command = 1;
 			LOG_INFO_APP("Modem registered, roaming\r\n");
 		} else {
-			LOG_INFO_APP("Modem not registered\r\n");
-			if (data_register_retry > 0) {
-				current_command = AT_CGREG_QUERY;
-				data_register_retry--;
-			} else {
-				current_command = AT_CGDCONT;
-			}
-			UTIL_TIMER_StartWithPeriod(
-					&cellularContext.cellular_command_timer_Id,
-					timer_period_modem_cmd_ms);
+			LOG_INFO_APP("Modem CGREG registration failed; ending cellular cycle\r\n");
+			Send_Data_Done();
 		}
 	} else {
 		LOG_INFO_APP("Modem CGREG parse error\r\n");
@@ -450,24 +427,9 @@ void modem_cdns_gip(const char *param) {
 		dns_result_pending = 0;
 		/* The modem reports +CDNSGIP failure followed by a transaction ERROR. */
 		ignore_dns_error = 1;
-		if (dns_request_retry > 0U) {
-			dns_request_retry--;
-			LOG_INFO_APP("Retrying DNS resolution (%d retries left)\r\n",
-					dns_request_retry);
-			current_command = AT_CDNSGIP;
-			dns_result_pending = 1;
-			UTIL_TIMER_StartWithPeriod(
-					&cellularContext.cellular_command_timer_Id, 1000);
-		} else if (data_cycle_finished == 0U) {
-			/* Avoid repeating a hostname lookup that already failed. */
-			if (strcmp(app_config.config.server_addr, DEFAULT_SERVER_HOST) == 0) {
-				tcp_use_numeric_ip = 1;
-				LOG_INFO_APP("Modem DNS unavailable; using server IP %s\r\n",
-						DEFAULT_SERVER_IP);
-			} else {
-				LOG_INFO_APP("Modem DNS unavailable; no numeric IP fallback for %s\r\n",
-						app_config.config.server_addr);
-			}
+		if (data_cycle_finished == 0U) {
+			LOG_INFO_APP("Modem DNS unavailable; trying configured server %s\r\n",
+					app_config.config.server_addr);
 			current_command = AT_CIPRXGET_SET;
 			UTIL_TIMER_StartWithPeriod(
 					&cellularContext.cellular_command_timer_Id,
@@ -501,18 +463,7 @@ void modem_cipopen(const char *param) {
 			LOG_INFO_APP(
 					"Modem CIPOPEN connection %d failed with status %d\r\n",
 					conn_id, status);
-			if (tcp_use_numeric_ip == 0U
-					&& strcmp(app_config.config.server_addr, DEFAULT_SERVER_HOST) == 0) {
-				tcp_use_numeric_ip = 1;
-				LOG_INFO_APP("Retrying TCP open with server IP %s\r\n",
-						DEFAULT_SERVER_IP);
-				current_command = AT_CIPRXGET_SET;
-				UTIL_TIMER_StartWithPeriod(
-						&cellularContext.cellular_command_timer_Id,
-						timer_period_modem_cmd_ms);
-			} else {
-				Send_Data_Done();
-			}
+			Send_Data_Done();
 		}
 	} else {
 		LOG_INFO_APP("Modem CIPOPEN parse error\r\n");
@@ -688,17 +639,7 @@ void modem_cntp(const char *param) {
 					timer_period_modem_cmd_ms);
 		} else {
 			LOG_INFO_APP("Modem CNTP get time failed\r\n");
-			if (ntp_request_retry > 0) {
-				current_command = AT_CNTP_GET;
-				ntp_request_retry--;
-			} else {
-				LOG_INFO_APP("Modem CNTP retries exhausted\r\n");
-				modem_continue_without_ntp();
-				return;
-			}
-			UTIL_TIMER_StartWithPeriod(
-					&cellularContext.cellular_command_timer_Id,
-					timer_period_modem_cmd_ms);
+			modem_continue_without_ntp();
 		}
 	} else {
 		LOG_INFO_APP("Modem CNTP parse error\r\n");
@@ -708,7 +649,6 @@ void modem_cntp(const char *param) {
 
 static void modem_continue_without_ntp(void) {
 	UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
-	ntp_request_retry = 0;
 	cntp_ok_seen = 0;
 	ignore_next_ok = 0;
 	current_command = AT_CCLK;
@@ -930,10 +870,9 @@ static void Send_Cellular_Command_Req(void *arg) {
 		break;
 	case AT_CIPOPEN: //AT+CIPOPEN=1,"TCP","<server>",<port>
 		char ATCIPOPEN[128];
-		const char *tcp_host = tcp_use_numeric_ip
-				? DEFAULT_SERVER_IP : app_config.config.server_addr;
 		if (tsnprintf(ATCIPOPEN, sizeof(ATCIPOPEN),
-				"AT+CIPOPEN=1,\"TCP\",\"%s\",%d\r\n", tcp_host,
+				"AT+CIPOPEN=1,\"TCP\",\"%s\",%d\r\n",
+				app_config.config.server_addr,
 				app_config.config.server_port) >= (int)sizeof(ATCIPOPEN)) {
 			LOG_INFO_APP("TCP hostname command is too long\r\n");
 			Send_Data_Done();
@@ -1015,16 +954,11 @@ void CMD_Init(void (*CmdProcessNotify)(void)) {
 	creg_stat = -1;
 	cgreg_n = 0;
 	cgreg_stat = -1;
-	ntp_request_retry = 2;
-	network_register_retry = 5;
-	data_register_retry = 5;
 	cip_close = -1;
 	ignore_next_ok = 0;
 	dns_result_pending = 0;
-	dns_request_retry = 2;
 	dns_ok_seen = 0;
 	ignore_dns_error = 0;
-	tcp_use_numeric_ip = 0;
 	cntp_ok_seen = 0;
 	netopen_ok_seen = 0;
 	data_cycle_finished = 0;
