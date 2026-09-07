@@ -70,6 +70,7 @@ static uint8_t ignore_next_ok = 0;
 static uint8_t dns_result_pending = 0;
 static uint8_t dns_request_retry = 2;
 static uint8_t dns_ok_seen = 0;
+static uint8_t ignore_dns_error = 0;
 static uint8_t cntp_ok_seen = 0;
 static uint8_t netopen_ok_seen = 0;
 static uint8_t data_cycle_finished = 0;
@@ -454,6 +455,7 @@ void modem_cdns_gip(const char *param) {
 		UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
 		LOG_INFO_APP("Modem DNS resolution succeeded\r\n");
 		dns_result_pending = 0;
+		ignore_dns_error = 0;
 		current_command = AT_CIPRXGET_SET;
 		ignore_next_ok = dns_ok_seen == 0U;
 		dns_ok_seen = 0;
@@ -466,6 +468,8 @@ void modem_cdns_gip(const char *param) {
 		LOG_INFO_APP("Modem DNS failed with status %d, error %d\r\n",
 				result, error_code);
 		dns_result_pending = 0;
+		/* The modem reports +CDNSGIP failure followed by a transaction ERROR. */
+		ignore_dns_error = 1;
 		if (dns_request_retry > 0U) {
 			dns_request_retry--;
 			LOG_INFO_APP("Retrying DNS resolution (%d retries left)\r\n",
@@ -649,8 +653,9 @@ void modem_error_resp(const char *param) {
 //			timer_period_modem_cmd_ms);
 	if (data_cycle_finished != 0U) {
 		return;
-	} else if (current_command == AT_CDNSGIP && dns_result_pending != 0U) {
-		/* +CDNSGIP already scheduled a retry; ignore its trailing ERROR. */
+	} else if (ignore_dns_error != 0U) {
+		ignore_dns_error = 0;
+		LOG_INFO_APP("Ignoring trailing DNS transaction ERROR\r\n");
 		return;
 	} else if (current_command == AT_CNTP_SET || current_command == AT_CNTP_GET) {
 		LOG_INFO_APP("Modem CNTP command rejected; continuing without time sync\r\n");
@@ -974,6 +979,7 @@ static void modem_response_timeout(void *arg) {
 	LOG_INFO_APP("Modem response timeout in command %d\r\n", current_command);
 	UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
 	dns_result_pending = 0;
+	ignore_dns_error = 0;
 	if (data_cycle_finished == 0U) {
 		data_cycle_finished = 1;
 		Send_Data_Done();
@@ -1009,6 +1015,7 @@ void CMD_Init(void (*CmdProcessNotify)(void)) {
 	dns_result_pending = 0;
 	dns_request_retry = 2;
 	dns_ok_seen = 0;
+	ignore_dns_error = 0;
 	cntp_ok_seen = 0;
 	netopen_ok_seen = 0;
 	data_cycle_finished = 0;
