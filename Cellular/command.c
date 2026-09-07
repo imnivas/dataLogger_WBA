@@ -132,6 +132,7 @@ void do_nothing(const char *param);
 
 void GSM_Uart_Transmit(uint8_t *p_data, uint16_t size);
 static void modem_response_timeout(void *arg);
+static void modem_continue_without_ntp(void);
 
 typedef enum AT_COMMANDS_SEQUENCE_e {
 	AT_E0 = 0,       // disable echo
@@ -622,7 +623,12 @@ void modem_ok_resp(const char *param) {
 void modem_error_resp(const char *param) {
 //	UTIL_TIMER_StartWithPeriod(&cellularContext.cellular_command_timer_Id,
 //			timer_period_modem_cmd_ms);
-	Send_Data_Done();
+	if (current_command == AT_CNTP_SET || current_command == AT_CNTP_GET) {
+		LOG_INFO_APP("Modem CNTP command rejected; continuing without time sync\r\n");
+		modem_continue_without_ntp();
+	} else {
+		Send_Data_Done();
+	}
 }
 
 void modem_cipsend_ready(const char *param) {
@@ -655,7 +661,7 @@ void modem_cntp(const char *param) {
 				ntp_request_retry--;
 			} else {
 				LOG_INFO_APP("Modem CNTP retries exhausted\r\n");
-				Send_Data_Done();
+				modem_continue_without_ntp();
 				return;
 			}
 			UTIL_TIMER_StartWithPeriod(
@@ -664,8 +670,19 @@ void modem_cntp(const char *param) {
 		}
 	} else {
 		LOG_INFO_APP("Modem CNTP parse error\r\n");
-		Send_Data_Done();
+		modem_continue_without_ntp();
 	}
+}
+
+static void modem_continue_without_ntp(void) {
+	UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
+	ntp_request_retry = 0;
+	cntp_ok_seen = 0;
+	ignore_next_ok = 0;
+	current_command = AT_CCLK;
+	LOG_INFO_APP("Continuing cellular upload without NTP synchronization\r\n");
+	UTIL_TIMER_StartWithPeriod(&cellularContext.cellular_command_timer_Id,
+			timer_period_modem_cmd_ms);
 }
 
 void modem_cclk(const char *param) {
