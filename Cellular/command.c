@@ -175,7 +175,7 @@ static const struct ATResponse_s ATResponse[] = {
 		{ .string = MODEM_CPIN_SIM_REMOVED, .size_string = sizeof(MODEM_CPIN_SIM_REMOVED)
 				- 1, .set = do_nothing, .run = modem_sim_removed },
 		//
-		{ .string = MODEM_SMS_DONE, .size_string = sizeof(MODEM_CPIN_READY) - 1,
+		{ .string = MODEM_SMS_DONE, .size_string = sizeof(MODEM_SMS_DONE) - 1,
 				.set = do_nothing, .run = modem_sms_ready },
 		//
 		{ .string = MODEM_CGEV, .size_string = sizeof(MODEM_CGEV) - 1, .set =
@@ -321,29 +321,6 @@ void modem_cgev(const char *param) {
 	if (strstr(param, "PDN ACT")) {
 		network_opened = 1;
 		LOG_INFO_APP("Modem network opened event\r\n");
-		if (UTIL_TIMER_IsRunning(&cellularContext.cellular_command_timer_Id)
-				== 0) {
-			LOG_INFO_APP("AT Start Command Timer\r\n");
-			current_command = AT_CREG;
-			UTIL_TIMER_StartWithPeriod(
-					&cellularContext.cellular_command_timer_Id,
-					timer_period_modem_cmd_ms);
-		} else {
-			uint32_t timer_remaining_period = 0;
-			UTIL_TIMER_GetRemainingTime(
-					&cellularContext.cellular_command_timer_Id,
-					&timer_remaining_period);
-			if (timer_remaining_period > timer_period_modem_cmd_ms) {
-				LOG_INFO_APP("AT Already Started and Pending Time :%d\r\n",
-						timer_remaining_period);
-				UTIL_TIMER_Stop(&cellularContext.cellular_command_timer_Id);
-				current_command = AT_CREG;
-				UTIL_TIMER_StartWithPeriod(
-						&cellularContext.cellular_command_timer_Id,
-						timer_period_modem_cmd_ms);
-			}
-
-		}
 	} else if (strstr(param, "PDN DEACT")) {
 		network_opened = 0;
 		LOG_INFO_APP("Modem network closed event\r\n");
@@ -500,6 +477,7 @@ void modem_cipopen(const char *param) {
 	//+CIPOPEN: 1,0 - 1 means connection 1 is opened successfully, 0 means success
 	int conn_id = -1;
 	int status = -1;
+	UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
 	if (2 == tiny_sscanf(param, " %d,%d", // expect format: +CIPOPEN: <conn_id>,<status>
 			&conn_id, &status)) {
 		if (status == 0) {
@@ -525,6 +503,7 @@ void modem_cipsend(const char *param) {
 	int conn_id = -1;
 	int reqSendLength = -1;
 	int cnfSendLength = -1;
+	UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
 	if (3 == tiny_sscanf(param, " %d,%d,%d", // expect format: +CIPSEND: <link_num>,<reqSendLength>,<cnfSendLength>
 			&conn_id, &reqSendLength, &cnfSendLength)) {
 		if (reqSendLength == cnfSendLength) {
@@ -927,6 +906,9 @@ static void Send_Cellular_Command_Req(void *arg) {
 	case AT_CIPRXGET_SET: //AT+CIPRXGET=1
 		const char *cmd9 = "AT+CIPRXGET=1\r\n";
 		GSM_Uart_Transmit((uint8_t*) cmd9, strlen(cmd9));
+		UTIL_TIMER_StartWithPeriod(
+				&cellularContext.cellular_response_timer_Id,
+				timer_period_modem_response_ms);
 		break;
 	case AT_CIPOPEN: //AT+CIPOPEN=1,"TCP","<server>",<port>
 		char ATCIPOPEN[128];
@@ -938,12 +920,18 @@ static void Send_Cellular_Command_Req(void *arg) {
 			break;
 		}
 		GSM_Uart_Transmit((uint8_t*) ATCIPOPEN, strlen(ATCIPOPEN));
+		UTIL_TIMER_StartWithPeriod(
+				&cellularContext.cellular_response_timer_Id,
+				timer_period_modem_response_ms);
 		break;
 	case AT_CIPSEND: //AT+CIPSEND=1,size
 		const char *cmd11 = "AT+CIPSEND=1,%d\r\n";
 		char ATCIPSEND[50];
 		tsnprintf(ATCIPSEND, sizeof(ATCIPSEND), cmd11, payload.BufferSize);
 		GSM_Uart_Transmit((uint8_t*) ATCIPSEND, strlen(ATCIPSEND));
+		UTIL_TIMER_StartWithPeriod(
+				&cellularContext.cellular_response_timer_Id,
+				timer_period_modem_response_ms);
 		break;
 	case AT_SEND: //send data
 	{

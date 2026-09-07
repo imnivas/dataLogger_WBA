@@ -34,6 +34,7 @@ static uint8_t   tcp_payload_buf[MAX_PAYLOAD_SIZE];
 static uint8_t   tx_buf[MAX_PACKET_BUF];
 static uint32_t  uplink_fcnt = 0;
 static uint32_t  downlink_fcnt = 0;
+static uint8_t cellular_cycle_active = 0;
 
 AppConfig_t app_config;
 
@@ -276,6 +277,7 @@ void RS485_ReadPZEM(void) {
 }
 
 static void Send_Data(void) {
+	cellular_cycle_active = 1;
 	UTIL_LPM_SetStopMode(1U << CFG_LPM_APP, UTIL_LPM_DISABLE);
 	RS485_ReadPZEM();
 	BuildPayload();
@@ -327,6 +329,10 @@ void BuildPayload(void) {
 }
 
 void Send_Data_Done(void){
+   if (cellular_cycle_active == 0U) {
+      return;
+   }
+   cellular_cycle_active = 0;
    CellularDeInit();
    UTIL_LPM_SetStopMode(1U << CFG_LPM_APP, UTIL_LPM_ENABLE);
    UTIL_TIMER_StartWithPeriod(&applicationContext.SEND_Data_timer_Id,
