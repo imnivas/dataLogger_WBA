@@ -71,6 +71,7 @@ static uint8_t dns_result_pending = 0;
 static uint8_t dns_request_retry = 2;
 static uint8_t dns_ok_seen = 0;
 static uint8_t ignore_dns_error = 0;
+static uint8_t tcp_use_numeric_ip = 0;
 static uint8_t cntp_ok_seen = 0;
 static uint8_t netopen_ok_seen = 0;
 static uint8_t data_cycle_finished = 0;
@@ -105,6 +106,8 @@ static void (*RxCpltCallbackhlp1)(uint8_t *rxChar, uint16_t size, uint8_t error)
 #define MODEM_CIPSEND_READY ">"
 #define MODEM_IPCLOSE 		"+IPCLOSE"
 #define MODEM_CIPCLOSE 		"+CIPCLOSE"
+#define DEFAULT_SERVER_HOST	"platform.adarko.io"
+#define DEFAULT_SERVER_IP	"174.138.120.173"
 
 #define MODEM_USER_DL_HEADER "901A"
 
@@ -456,8 +459,15 @@ void modem_cdns_gip(const char *param) {
 			UTIL_TIMER_StartWithPeriod(
 					&cellularContext.cellular_command_timer_Id, 1000);
 		} else if (data_cycle_finished == 0U) {
-			/* CIPOPEN can resolve hostnames itself on some modem firmware. */
-			LOG_INFO_APP("Modem DNS unavailable; trying direct TCP hostname open\r\n");
+			/* Avoid repeating a hostname lookup that already failed. */
+			if (strcmp(app_config.config.server_addr, DEFAULT_SERVER_HOST) == 0) {
+				tcp_use_numeric_ip = 1;
+				LOG_INFO_APP("Modem DNS unavailable; using server IP %s\r\n",
+						DEFAULT_SERVER_IP);
+			} else {
+				LOG_INFO_APP("Modem DNS unavailable; no numeric IP fallback for %s\r\n",
+						app_config.config.server_addr);
+			}
 			current_command = AT_CIPRXGET_SET;
 			UTIL_TIMER_StartWithPeriod(
 					&cellularContext.cellular_command_timer_Id,
@@ -491,7 +501,18 @@ void modem_cipopen(const char *param) {
 			LOG_INFO_APP(
 					"Modem CIPOPEN connection %d failed with status %d\r\n",
 					conn_id, status);
-					Send_Data_Done();
+			if (tcp_use_numeric_ip == 0U
+					&& strcmp(app_config.config.server_addr, DEFAULT_SERVER_HOST) == 0) {
+				tcp_use_numeric_ip = 1;
+				LOG_INFO_APP("Retrying TCP open with server IP %s\r\n",
+						DEFAULT_SERVER_IP);
+				current_command = AT_CIPRXGET_SET;
+				UTIL_TIMER_StartWithPeriod(
+						&cellularContext.cellular_command_timer_Id,
+						timer_period_modem_cmd_ms);
+			} else {
+				Send_Data_Done();
+			}
 		}
 	} else {
 		LOG_INFO_APP("Modem CIPOPEN parse error\r\n");
@@ -591,9 +612,7 @@ void modem_ok_resp(const char *param) {
 				&cellularContext.cellular_command_timer_Id,
 				timer_period_modem_cmd_ms);
 	} else if (current_command == AT_CCLK) {
-		/* Keep modem-assigned DNS settings; do not overwrite them with invalid
-		 * public or placeholder addresses. */
-		current_command = AT_CDNSGIP;
+		current_command = AT_CDNSCFG;
 		UTIL_TIMER_StartWithPeriod(
 				&cellularContext.cellular_command_timer_Id,
 				timer_period_modem_cmd_ms);
@@ -884,8 +903,7 @@ static void Send_Cellular_Command_Req(void *arg) {
 				timer_period_modem_response_ms);
 		break;
 	case AT_CDNSCFG: //AT+CDNSCFG="
-		/* Use carrier-provided DNS; public DNS is often blocked on mobile APNs. */
-		const char *cmd7 = "AT+CDNSCFG=\"0.0.0.0\",\"0.0.0.0\"\r\n";
+		const char *cmd7 = "AT+CDNSCFG=\"8.8.8.8\",\"1.1.1.1\"\r\n";
 		GSM_Uart_Transmit((uint8_t*) cmd7, strlen(cmd7));
 		break;
 	case AT_CDNSGIP: //AT+CDNSGIP="
@@ -912,8 +930,10 @@ static void Send_Cellular_Command_Req(void *arg) {
 		break;
 	case AT_CIPOPEN: //AT+CIPOPEN=1,"TCP","<server>",<port>
 		char ATCIPOPEN[128];
+		const char *tcp_host = tcp_use_numeric_ip
+				? DEFAULT_SERVER_IP : app_config.config.server_addr;
 		if (tsnprintf(ATCIPOPEN, sizeof(ATCIPOPEN),
-				"AT+CIPOPEN=1,\"TCP\",\"%s\",%d\r\n", app_config.config.server_addr,
+				"AT+CIPOPEN=1,\"TCP\",\"%s\",%d\r\n", tcp_host,
 				app_config.config.server_port) >= (int)sizeof(ATCIPOPEN)) {
 			LOG_INFO_APP("TCP hostname command is too long\r\n");
 			Send_Data_Done();
@@ -1004,6 +1024,7 @@ void CMD_Init(void (*CmdProcessNotify)(void)) {
 	dns_request_retry = 2;
 	dns_ok_seen = 0;
 	ignore_dns_error = 0;
+	tcp_use_numeric_ip = 0;
 	cntp_ok_seen = 0;
 	netopen_ok_seen = 0;
 	data_cycle_finished = 0;

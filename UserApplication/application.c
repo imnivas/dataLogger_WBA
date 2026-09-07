@@ -103,7 +103,7 @@ static void AppConfig_ApplyDefaults(void)
     app_config.magic1                      = APP_CONFIG_MAGIC;
     app_config.version                     = APP_CONFIG_VERSION;
     app_config.config.frame_head           = USER_CONFIG_FRAME_HEAD;
-    strncpy(app_config.config.apn,         "airtelgprs.com",    sizeof(app_config.config.apn) - 1);
+    strncpy(app_config.config.apn,         "iot.com",           sizeof(app_config.config.apn) - 1);
     strncpy(app_config.config.server_addr, "platform.adarko.io", sizeof(app_config.config.server_addr) - 1);
     app_config.config.server_port          = 8900;
     app_config.config.modbus_slave_id      = 2;
@@ -116,6 +116,12 @@ void AppConfig_Load(void)
     if (f->magic1 == APP_CONFIG_MAGIC && f->magic2 == APP_CONFIG_MAGIC) {
         memcpy(&app_config, f, sizeof(AppConfig_t));
         LOG_INFO_APP("AppConfig: loaded from flash\r\n");
+        if (strcmp(app_config.config.apn, "airtelgprs.com") == 0) {
+            strncpy(app_config.config.apn, "iot.com",
+                    sizeof(app_config.config.apn) - 1);
+            AppConfig_Save();
+            LOG_INFO_APP("AppConfig: migrated APN to iot.com\r\n");
+        }
     } else {
         AppConfig_ApplyDefaults();
 		AppConfig_Save();
