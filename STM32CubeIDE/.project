@@ -290,6 +290,11 @@
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/gpio.c</locationURI>
 		</link>
 		<link>
+			<name>Application/User/Core/eeprom_m24m02.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/eeprom_m24m02.c</locationURI>
+		</link>
+		<link>
 			<name>Application/User/Core/i2c.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/i2c.c</locationURI>
@@ -343,6 +348,11 @@
 			<name>Application/User/UserApplication/application.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/UserApplication/application.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/UserApplication/eeprom_log.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/UserApplication/eeprom_log.c</locationURI>
 		</link>
 		<link>
 			<name>Common/WPAN/Interface/adv_trace_usart_if.c</name>

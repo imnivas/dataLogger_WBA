@@ -23,6 +23,7 @@
 #include "temp_measurement.h"
 #include "stm32wbaxx_ll_adc.h"
 #include "stm32_systime.h"
+#include "eeprom_log.h"
 
 ApplicationContext_t applicationContext;
 
@@ -178,6 +179,7 @@ void UserApplicationInit(void) {
 		
 
 	AppConfig_Load();
+	EepromLog_Init();
 	Log_EUI64();
 	SysTime_t sysTime = SysTimeGet();
 	LOG_INFO_APP("SysTime: %lu s  SubSeconds: %d\r\n",
@@ -296,6 +298,7 @@ static void Send_Data(void) {
 	UTIL_LPM_SetStopMode(1U << CFG_LPM_APP, UTIL_LPM_DISABLE);
 	RS485_ReadPZEM();
 	BuildPayload();
+	EepromLog_Store(payload.Buffer, payload.BufferSize);
 	MeterReadProcessInit();
 	CellularInit();
 }

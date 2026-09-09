@@ -100,6 +100,9 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 
+#define LCD_SW_EN_Pin GPIO_PIN_10
+#define LCD_SW_EN_GPIO_Port GPIOA
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

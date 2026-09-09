@@ -48,7 +48,6 @@ Modem_Status_s modem_status = { 0, 0, 0 };
 
 typedef struct {
 	UTIL_TIMER_Object_t cellular_command_timer_Id;
-	UTIL_TIMER_Object_t cellular_response_timer_Id;
 } CellularContext_t;
 
 static CellularContext_t cellularContext;
@@ -62,21 +61,17 @@ int cgreg_n = 0;
 int cgreg_stat = -1;
 int network_opened = 0;
 int tcp_udp_network_opened = 0;
+int ntp_request_retry = 2;
+int network_register_retry = 5;
+int data_register_retry = 5;
 int cip_close = -1;
-static uint8_t ignore_next_ok = 0;
-static uint8_t dns_result_pending = 0;
-static uint8_t dns_ok_seen = 0;
-static uint8_t ignore_dns_error = 0;
-static uint8_t cntp_ok_seen = 0;
-static uint8_t netopen_ok_seen = 0;
-static uint8_t data_cycle_finished = 0;
 uint32_t timer_period_modem_init_ms = 60000;
 uint32_t timer_period_modem_cmd_ms = 200;
-uint32_t timer_period_modem_response_ms = 60000;
 
 #define CMD_SIZE                        540
 #define CIRC_BUFF_SIZE                  256
 ///* Character added when a RX error has been detected */
+#define AT_ERROR_RX_CHAR 0x01
 
 static void (*RxCpltCallbackhlp1)(uint8_t *rxChar, uint16_t size, uint8_t error);
 
@@ -91,7 +86,6 @@ static void (*RxCpltCallbackhlp1)(uint8_t *rxChar, uint16_t size, uint8_t error)
 #define MODEM_OK 			"OK"
 #define MODEM_ERROR 		"ERROR"
 #define MODEM_NETOPEN 		"+NETOPEN"
-#define MODEM_CDNSGIP 		"+CDNSGIP"
 #define MODEM_CIPOPEN 		"+CIPOPEN"
 #define MODEM_CIPSEND 		"+CIPSEND"
 #define MODEM_CNTP_GET 		"+CNTP"
@@ -115,7 +109,6 @@ void modem_csq(const char *param);
 void modem_creg(const char *param);
 void modem_cgreg(const char *param);
 void modem_netopen(const char *param);
-void modem_cdns_gip(const char *param);
 void modem_cipopen(const char *param);
 void modem_cipsend(const char *param);
 void modem_cntp(const char *param);
@@ -129,8 +122,6 @@ void modem_ciprxget(const char *param);
 void do_nothing(const char *param);
 
 void GSM_Uart_Transmit(uint8_t *p_data, uint16_t size);
-static void modem_response_timeout(void *arg);
-static void modem_continue_without_ntp(void);
 
 typedef enum AT_COMMANDS_SEQUENCE_e {
 	AT_E0 = 0,       // disable echo
@@ -170,7 +161,7 @@ static const struct ATResponse_s ATResponse[] = {
 		{ .string = MODEM_CPIN_SIM_REMOVED, .size_string = sizeof(MODEM_CPIN_SIM_REMOVED)
 				- 1, .set = do_nothing, .run = modem_sim_removed },
 		//
-		{ .string = MODEM_SMS_DONE, .size_string = sizeof(MODEM_SMS_DONE) - 1,
+		{ .string = MODEM_SMS_DONE, .size_string = sizeof(MODEM_CPIN_READY) - 1,
 				.set = do_nothing, .run = modem_sms_ready },
 		//
 		{ .string = MODEM_CGEV, .size_string = sizeof(MODEM_CGEV) - 1, .set =
@@ -193,9 +184,6 @@ static const struct ATResponse_s ATResponse[] = {
 		//
 		{ .string = MODEM_NETOPEN, .size_string = sizeof(MODEM_NETOPEN) - 1,
 				.set = modem_netopen, .run = do_nothing },
-		//
-		{ .string = MODEM_CDNSGIP, .size_string = sizeof(MODEM_CDNSGIP) - 1,
-				.set = modem_cdns_gip, .run = do_nothing },
 		//
 		{ .string = MODEM_CIPOPEN, .size_string = sizeof(MODEM_CIPOPEN) - 1,
 				.set = modem_cipopen, .run = do_nothing },
@@ -316,6 +304,29 @@ void modem_cgev(const char *param) {
 	if (strstr(param, "PDN ACT")) {
 		network_opened = 1;
 		LOG_INFO_APP("Modem network opened event\r\n");
+		if (UTIL_TIMER_IsRunning(&cellularContext.cellular_command_timer_Id)
+				== 0) {
+			LOG_INFO_APP("AT Start Command Timer\r\n");
+			current_command = AT_CREG;
+			UTIL_TIMER_StartWithPeriod(
+					&cellularContext.cellular_command_timer_Id,
+					timer_period_modem_cmd_ms);
+		} else {
+			uint32_t timer_remaining_period = 0;
+			UTIL_TIMER_GetRemainingTime(
+					&cellularContext.cellular_command_timer_Id,
+					&timer_remaining_period);
+			if (timer_remaining_period > timer_period_modem_cmd_ms) {
+				LOG_INFO_APP("AT Already Started and Pending Time :%d\r\n",
+						timer_remaining_period);
+				UTIL_TIMER_Stop(&cellularContext.cellular_command_timer_Id);
+				current_command = AT_CREG;
+				UTIL_TIMER_StartWithPeriod(
+						&cellularContext.cellular_command_timer_Id,
+						timer_period_modem_cmd_ms);
+			}
+
+		}
 	} else if (strstr(param, "PDN DEACT")) {
 		network_opened = 0;
 		LOG_INFO_APP("Modem network closed event\r\n");
@@ -337,8 +348,16 @@ void modem_creg(const char *param) {
 			execute_next_command = 1;
 			LOG_INFO_APP("Modem registered, roaming\r\n");
 		} else {
-			LOG_INFO_APP("Modem CREG registration failed; ending cellular cycle\r\n");
-			Send_Data_Done();
+			LOG_INFO_APP("Modem not registered\r\n");
+			if (network_register_retry > 0) {
+				current_command = AT_CREG_QUERY;
+				network_register_retry--;
+			} else {
+				current_command = AT_CGREG_QUERY;
+			}
+			UTIL_TIMER_StartWithPeriod(
+					&cellularContext.cellular_command_timer_Id,
+					timer_period_modem_cmd_ms);
 		}
 	} else {
 		LOG_INFO_APP("Modem CREG parse error\r\n");
@@ -348,7 +367,7 @@ void modem_creg(const char *param) {
 void modem_cgreg(const char *param) {
 
 	if (2 == tiny_sscanf(param, " %d,%d", // expect format: +CGREG: <n>,<stat>
-			&cgreg_n, &cgreg_stat)) {
+			&creg_n, &cgreg_stat)) {
 		LOG_INFO_APP("Modem CGREG n:%d, stat:%d\r\n", cgreg_n, cgreg_stat);
 		if (cgreg_stat == 1) {
 			execute_next_command = 1;
@@ -357,8 +376,16 @@ void modem_cgreg(const char *param) {
 			execute_next_command = 1;
 			LOG_INFO_APP("Modem registered, roaming\r\n");
 		} else {
-			LOG_INFO_APP("Modem CGREG registration failed; ending cellular cycle\r\n");
-			Send_Data_Done();
+			LOG_INFO_APP("Modem not registered\r\n");
+			if (data_register_retry > 0) {
+				current_command = AT_CGREG_QUERY;
+				data_register_retry--;
+			} else {
+				current_command = AT_CGDCONT;
+			}
+			UTIL_TIMER_StartWithPeriod(
+					&cellularContext.cellular_command_timer_Id,
+					timer_period_modem_cmd_ms);
 		}
 	} else {
 		LOG_INFO_APP("Modem CGREG parse error\r\n");
@@ -381,65 +408,19 @@ void modem_csq(const char *param) {
 void modem_netopen(const char *param) {
 
 	int status = 1;
-	UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
 	if (1 == tiny_sscanf(param, " %d", // expect format: 0
 			&status)) {
 		if (status == 0) {
 			LOG_INFO_APP("Modem network opened\r\n");
 			current_command = AT_CDNSCFG;
-			ignore_next_ok = netopen_ok_seen == 0U;
-			netopen_ok_seen = 0;
 			UTIL_TIMER_StartWithPeriod(
 					&cellularContext.cellular_command_timer_Id,
 					timer_period_modem_cmd_ms);
 		} else {
 			LOG_INFO_APP("Modem network failed\r\n");
-			Send_Data_Done();
 		}
 	} else {
 		LOG_INFO_APP("Modem NETOPEN parse error\r\n");
-	}
-}
-
-void modem_cdns_gip(const char *param) {
-	int result = -1;
-	int error_code = -1;
-
-	/* SIMCom responses are typically +CDNSGIP: 1,"host","ip" or : 0. */
-	if (1 == tiny_sscanf(param, " %d", &result) && result == 1) {
-		UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
-		LOG_INFO_APP("Modem DNS resolution succeeded\r\n");
-		dns_result_pending = 0;
-		ignore_dns_error = 0;
-		current_command = AT_CIPRXGET_SET;
-		ignore_next_ok = dns_ok_seen == 0U;
-		dns_ok_seen = 0;
-		UTIL_TIMER_StartWithPeriod(
-				&cellularContext.cellular_command_timer_Id,
-				timer_period_modem_cmd_ms);
-	} else if (2 == tiny_sscanf(param, " %d,%d", &result, &error_code)
-			&& result == 0) {
-		UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
-		LOG_INFO_APP("Modem DNS failed with status %d, error %d\r\n",
-				result, error_code);
-		dns_result_pending = 0;
-		/* The modem reports +CDNSGIP failure followed by a transaction ERROR. */
-		ignore_dns_error = 1;
-		if (data_cycle_finished == 0U) {
-			LOG_INFO_APP("Modem DNS unavailable; trying configured server %s\r\n",
-					app_config.config.server_addr);
-			current_command = AT_CIPRXGET_SET;
-			UTIL_TIMER_StartWithPeriod(
-					&cellularContext.cellular_command_timer_Id,
-					timer_period_modem_cmd_ms);
-		}
-	} else {
-		UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
-		LOG_INFO_APP("Modem DNS parse error\r\n");
-		if (data_cycle_finished == 0U) {
-			data_cycle_finished = 1;
-			Send_Data_Done();
-		}
 	}
 }
 
@@ -447,7 +428,6 @@ void modem_cipopen(const char *param) {
 	//+CIPOPEN: 1,0 - 1 means connection 1 is opened successfully, 0 means success
 	int conn_id = -1;
 	int status = -1;
-	UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
 	if (2 == tiny_sscanf(param, " %d,%d", // expect format: +CIPOPEN: <conn_id>,<status>
 			&conn_id, &status)) {
 		if (status == 0) {
@@ -459,10 +439,9 @@ void modem_cipopen(const char *param) {
 					timer_period_modem_cmd_ms);
 		} else {
 			LOG_INFO_APP(
-					"Modem CIPOPEN connection %d failed with TCP status %d "
-					"(hostname used after DNS resolution failed)\r\n",
+					"Modem CIPOPEN connection %d failed with status %d\r\n",
 					conn_id, status);
-			Send_Data_Done();
+					Send_Data_Done();
 		}
 	} else {
 		LOG_INFO_APP("Modem CIPOPEN parse error\r\n");
@@ -474,7 +453,6 @@ void modem_cipsend(const char *param) {
 	int conn_id = -1;
 	int reqSendLength = -1;
 	int cnfSendLength = -1;
-	UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
 	if (3 == tiny_sscanf(param, " %d,%d,%d", // expect format: +CIPSEND: <link_num>,<reqSendLength>,<cnfSendLength>
 			&conn_id, &reqSendLength, &cnfSendLength)) {
 		if (reqSendLength == cnfSendLength) {
@@ -543,29 +521,8 @@ void modem_ciprxget(const char *param) {
 void modem_ok_resp(const char *param) {
 
 	//LOG_INFO_APP("Current Command %d\r\n", current_command);
-	if (ignore_next_ok != 0U) {
-		ignore_next_ok = 0;
-		return;
-	}
-
-	/* CDNSGIP completes asynchronously; its OK is not the DNS result. */
-	if (current_command == AT_CDNSGIP && dns_result_pending != 0U) {
-		dns_ok_seen = 1;
-		return;
-	}
-
 	//move to next command only if not in the middle of network open, cipopen, cipsend, cntp get, send data, ciprxget read
-	if (current_command == AT_CGDCONT) {
-		current_command = AT_CNTP_SET;
-		UTIL_TIMER_StartWithPeriod(
-				&cellularContext.cellular_command_timer_Id,
-				timer_period_modem_cmd_ms);
-	} else if (current_command == AT_CCLK) {
-		current_command = AT_NETOPEN;
-		UTIL_TIMER_StartWithPeriod(
-				&cellularContext.cellular_command_timer_Id,
-				timer_period_modem_cmd_ms);
-	} else if (current_command != AT_NETOPEN && current_command != AT_CIPOPEN
+	if (current_command != AT_NETOPEN && current_command != AT_CIPOPEN
 			&& current_command != AT_CIPSEND && current_command != AT_CNTP_GET
 			&& current_command != AT_SEND && current_command != AT_CIPRXGET_READ) {
 
@@ -589,27 +546,12 @@ void modem_ok_resp(const char *param) {
 //					&cellularContext.cellular_command_timer_Id,
 //					timer_period_modem_cmd_ms);
 //		}
-	} else if (current_command == AT_NETOPEN) {
-		netopen_ok_seen = 1;
-	} else if (current_command == AT_CNTP_GET) {
-		cntp_ok_seen = 1;
 	}
 }
 void modem_error_resp(const char *param) {
 //	UTIL_TIMER_StartWithPeriod(&cellularContext.cellular_command_timer_Id,
 //			timer_period_modem_cmd_ms);
-	if (data_cycle_finished != 0U) {
-		return;
-	} else if (ignore_dns_error != 0U) {
-		ignore_dns_error = 0;
-		LOG_INFO_APP("Ignoring trailing DNS transaction ERROR\r\n");
-		return;
-	} else if (current_command == AT_CNTP_SET || current_command == AT_CNTP_GET) {
-		LOG_INFO_APP("Modem CNTP command rejected; continuing without time sync\r\n");
-		modem_continue_without_ntp();
-	} else {
-		Send_Data_Done();
-	}
+	Send_Data_Done();
 }
 
 void modem_cipsend_ready(const char *param) {
@@ -624,35 +566,29 @@ void modem_cipsend_ready(const char *param) {
 void modem_cntp(const char *param) {
 	int datetime = -1;
 	//+CNTP: 0
-	UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
 	if (1 == tiny_sscanf(param, " %d", // expect format: +CNTP: <status>
 			&datetime)) {
 		if (datetime == 0) {
 			LOG_INFO_APP("Modem CNTP get time success\r\n");
 			current_command = AT_CCLK;
-			ignore_next_ok = cntp_ok_seen == 0U;
-			cntp_ok_seen = 0;
 			UTIL_TIMER_StartWithPeriod(
 					&cellularContext.cellular_command_timer_Id,
 					timer_period_modem_cmd_ms);
 		} else {
 			LOG_INFO_APP("Modem CNTP get time failed\r\n");
-			modem_continue_without_ntp();
+			if (ntp_request_retry > 0) {
+				current_command = AT_CNTP_GET;
+				ntp_request_retry--;
+			} else {
+				current_command = AT_CCLK;
+			}
+			UTIL_TIMER_StartWithPeriod(
+					&cellularContext.cellular_command_timer_Id,
+					timer_period_modem_cmd_ms);
 		}
 	} else {
 		LOG_INFO_APP("Modem CNTP parse error\r\n");
-		modem_continue_without_ntp();
 	}
-}
-
-static void modem_continue_without_ntp(void) {
-	UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
-	cntp_ok_seen = 0;
-	ignore_next_ok = 0;
-	current_command = AT_CCLK;
-	LOG_INFO_APP("Continuing cellular upload without NTP synchronization\r\n");
-	UTIL_TIMER_StartWithPeriod(&cellularContext.cellular_command_timer_Id,
-			timer_period_modem_cmd_ms);
 }
 
 void modem_cclk(const char *param) {
@@ -667,13 +603,6 @@ void modem_cclk(const char *param) {
 					&day, &hour, &min, &sec, &tz)) {
 		LOG_INFO_APP("Modem CCLK parse date time :%d-%d-%d %d:%d:%d tz:%d\r\n",
 				year, month, day, hour, min, sec, tz);
-		if ((year == 70 && month == 1 && day == 1)
-				|| month < 1 || month > 12 || day < 1 || day > 31
-				|| hour < 0 || hour > 23 || min < 0 || min > 59
-				|| sec < 0 || sec > 59) {
-			LOG_INFO_APP("Modem CCLK contains invalid/unset time; keeping current time\r\n");
-			return;
-		}
 		/* Manual Unix epoch — avoids broken mktime on this libc.
 		 * yy is 2-digit year relative to 2000 (e.g. 26 = 2026). */
 		static const uint16_t yday[12] = {0,31,59,90,120,151,181,212,243,273,304,334};
@@ -812,14 +741,9 @@ static void Send_Cellular_Command_Req(void *arg) {
 		GSM_Uart_Transmit((uint8_t*) cmd_cclk, strlen(cmd_cclk));
 		break;
 	case AT_CGDCONT: //AT+CGDCONT=1,"IP","<apn>"
-		char ATCGDCONT[96];
-		if (tsnprintf(ATCGDCONT, sizeof(ATCGDCONT),
-				"AT+CGDCONT=1,\"ip\",\"%s\"\r\n", app_config.config.apn)
-				>= (int)sizeof(ATCGDCONT)) {
-			LOG_INFO_APP("APN command is too long\r\n");
-			Send_Data_Done();
-			break;
-		}
+		char ATCGDCONT[50];
+		tsnprintf(ATCGDCONT, sizeof(ATCGDCONT),
+				"AT+CGDCONT=1,\"ip\",\"%s\"\r\n", app_config.config.apn);
 		GSM_Uart_Transmit((uint8_t*) ATCGDCONT, strlen(ATCGDCONT));
 		break;
 	case AT_CNTP_SET: //AT+CNTP="time.nist.gov",123
@@ -829,16 +753,10 @@ static void Send_Cellular_Command_Req(void *arg) {
 	case AT_CNTP_GET: //AT+CNTP
 		const char *cmd_cntp_get = "AT+CNTP\r\n";
 		GSM_Uart_Transmit((uint8_t*) cmd_cntp_get, strlen(cmd_cntp_get));
-		UTIL_TIMER_StartWithPeriod(
-				&cellularContext.cellular_response_timer_Id,
-				timer_period_modem_response_ms);
 		break;
 	case AT_NETOPEN: //AT+NETOPEN
 		const char *cmd6 = "AT+NETOPEN\r\n";
 		GSM_Uart_Transmit((uint8_t*) cmd6, strlen(cmd6));
-		UTIL_TIMER_StartWithPeriod(
-				&cellularContext.cellular_response_timer_Id,
-				timer_period_modem_response_ms);
 		break;
 	case AT_CDNSCFG: //AT+CDNSCFG="
 		const char *cmd7 = "AT+CDNSCFG=\"8.8.8.8\",\"8.8.4.4\"\r\n";
@@ -846,49 +764,26 @@ static void Send_Cellular_Command_Req(void *arg) {
 		break;
 	case AT_CDNSGIP: //AT+CDNSGIP="
 		const char *cmd8 = "AT+CDNSGIP=\"%s\"\r\n";
-		char ATCDNSGIP[96];
-		if (tsnprintf(ATCDNSGIP, sizeof(ATCDNSGIP), cmd8,
-				app_config.config.server_addr) >= (int)sizeof(ATCDNSGIP)) {
-			LOG_INFO_APP("DNS hostname command is too long\r\n");
-			Send_Data_Done();
-			break;
-		}
-		dns_result_pending = 1;
+		char ATCDNSGIP[50];
+		tsnprintf(ATCDNSGIP, sizeof(ATCDNSGIP), cmd8, app_config.config.server_addr);
 		GSM_Uart_Transmit((uint8_t*) ATCDNSGIP, strlen(ATCDNSGIP));
-		UTIL_TIMER_StartWithPeriod(
-				&cellularContext.cellular_response_timer_Id,
-				timer_period_modem_response_ms);
 		break;
 	case AT_CIPRXGET_SET: //AT+CIPRXGET=1
 		const char *cmd9 = "AT+CIPRXGET=1\r\n";
 		GSM_Uart_Transmit((uint8_t*) cmd9, strlen(cmd9));
-		UTIL_TIMER_StartWithPeriod(
-				&cellularContext.cellular_response_timer_Id,
-				timer_period_modem_response_ms);
 		break;
 	case AT_CIPOPEN: //AT+CIPOPEN=1,"TCP","<server>",<port>
-		char ATCIPOPEN[128];
-		if (tsnprintf(ATCIPOPEN, sizeof(ATCIPOPEN),
-				"AT+CIPOPEN=1,\"TCP\",\"%s\",%d\r\n",
-				app_config.config.server_addr,
-				app_config.config.server_port) >= (int)sizeof(ATCIPOPEN)) {
-			LOG_INFO_APP("TCP hostname command is too long\r\n");
-			Send_Data_Done();
-			break;
-		}
+		char ATCIPOPEN[100];
+		tsnprintf(ATCIPOPEN, sizeof(ATCIPOPEN),
+				"AT+CIPOPEN=1,\"TCP\",\"%s\",%d\r\n", app_config.config.server_addr,
+				app_config.config.server_port);
 		GSM_Uart_Transmit((uint8_t*) ATCIPOPEN, strlen(ATCIPOPEN));
-		UTIL_TIMER_StartWithPeriod(
-				&cellularContext.cellular_response_timer_Id,
-				timer_period_modem_response_ms);
 		break;
 	case AT_CIPSEND: //AT+CIPSEND=1,size
 		const char *cmd11 = "AT+CIPSEND=1,%d\r\n";
 		char ATCIPSEND[50];
 		tsnprintf(ATCIPSEND, sizeof(ATCIPSEND), cmd11, payload.BufferSize);
 		GSM_Uart_Transmit((uint8_t*) ATCIPSEND, strlen(ATCIPSEND));
-		UTIL_TIMER_StartWithPeriod(
-				&cellularContext.cellular_response_timer_Id,
-				timer_period_modem_response_ms);
 		break;
 	case AT_SEND: //send data
 	{
@@ -919,18 +814,6 @@ static void Send_Cellular_Command_Req(void *arg) {
 	}
 
 }
-
-static void modem_response_timeout(void *arg) {
-	LOG_INFO_APP("Modem response timeout in command %d\r\n", current_command);
-	UTIL_TIMER_Stop(&cellularContext.cellular_response_timer_Id);
-	dns_result_pending = 0;
-	ignore_dns_error = 0;
-	if (data_cycle_finished == 0U) {
-		data_cycle_finished = 1;
-		Send_Data_Done();
-	}
-}
-
 void CMD_Init(void (*CmdProcessNotify)(void)) {
 	//at_init();    /*Preset AT registers to defaults*/
 
@@ -950,20 +833,8 @@ void CMD_Init(void (*CmdProcessNotify)(void)) {
 	execute_next_command = 1;
 	creg_n = 0;
 	creg_stat = -1;
-	cgreg_n = 0;
-	cgreg_stat = -1;
-	cip_close = -1;
-	ignore_next_ok = 0;
-	dns_result_pending = 0;
-	dns_ok_seen = 0;
-	ignore_dns_error = 0;
-	cntp_ok_seen = 0;
-	netopen_ok_seen = 0;
-	data_cycle_finished = 0;
 	UTIL_TIMER_Create(&(cellularContext.cellular_command_timer_Id), 0,
 			UTIL_TIMER_ONESHOT, &Send_Cellular_Command_Req, 0);
-	UTIL_TIMER_Create(&(cellularContext.cellular_response_timer_Id), 0,
-			UTIL_TIMER_ONESHOT, &modem_response_timeout, 0);
 }
 
 void CMD_Process(void) {
@@ -986,7 +857,17 @@ void CMD_Process(void) {
 		//LOG_INFO_APP("%c", circBuffer[ridx]);
 #endif /* 0 */
 
-		if (circBuffer[ridx] == '>') {
+		if (circBuffer[ridx] == AT_ERROR_RX_CHAR) {
+			ridx++;
+			if (ridx == CIRC_BUFF_SIZE) {
+				ridx = 0;
+			}
+			UTILS_ENTER_CRITICAL_SECTION();
+			charCount--;
+			UTILS_EXIT_CRITICAL_SECTION();
+			com_error(AT_RX_ERROR);
+			i = 0;
+		} else if (circBuffer[ridx] == '>') {
 			ridx++;
 			if (ridx == CIRC_BUFF_SIZE) {
 				ridx = 0;
